@@ -1,0 +1,176 @@
+@import "tailwindcss";
+
+:root {
+  --brand-green: #157037;
+  --brand-green-rich: #116332;
+  --brand-green-deep: #0c3d1e;
+  --brand-mint: #2f9a58;
+  --brand-gold: #dfb026;
+  --brand-gold-deep: #b88912;
+  --canvas: #ffffff;
+  --canvas-muted: #f4f7f5;
+  --ink: #142117;
+  --muted: #5d6b62;
+  --line: #e3ebe6;
+  --success: #157037;
+  --warning: #b88912;
+  --danger: #b42318;
+  --info: #1d5f8a;
+  --shadow-header: 0 14px 32px rgba(12, 61, 30, 0.18);
+  --shadow-soft: 0 8px 20px rgba(20, 33, 23, 0.06);
+  --shadow-panel: 0 24px 60px rgba(12, 61, 30, 0.22);
+  --radius-header: 1.75rem;
+  --radius-card: 1rem;
+  --container: 74rem;
+  --space-1: 0.25rem;
+  --space-2: 0.5rem;
+  --space-3: 0.75rem;
+  --space-4: 1rem;
+  --space-6: 1.5rem;
+  --space-8: 2rem;
+  --space-12: 3rem;
+  --space-16: 4rem;
+  --header-gradient: linear-gradient(105deg, #0e5a2c 0%, #157037 46%, #2f9a58 100%);
+  --font-sans: "Segoe UI", Tahoma, "Noto Naskh Arabic", "Geeza Pro", Arial, sans-serif;
+}
+
+@theme inline {
+  --color-brand: var(--brand-green);
+  --color-brand-rich: var(--brand-green-rich);
+  --color-brand-deep: var(--brand-green-deep);
+  --color-brand-mint: var(--brand-mint);
+  --color-brand-gold: var(--brand-gold);
+  --color-canvas: var(--canvas);
+  --color-canvas-muted: var(--canvas-muted);
+  --color-ink: var(--ink);
+  --color-muted: var(--muted);
+  --color-line: var(--line);
+  --color-success: var(--success);
+  --color-warning: var(--warning);
+  --color-danger: var(--danger);
+  --color-info: var(--info);
+  --font-sans: var(--font-sans);
+  --radius-card: var(--radius-card);
+  --shadow-header: var(--shadow-header);
+  --shadow-soft: var(--shadow-soft);
+  --shadow-panel: var(--shadow-panel);
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
+body {
+  margin: 0;
+  background: var(--canvas);
+  color: var(--ink);
+  font-family: var(--font-sans);
+}
+
+[dir="rtl"] {
+  letter-spacing: 0;
+}
+
+:focus-visible {
+  outline: 2px solid var(--brand-gold);
+  outline-offset: 2px;
+}
+
+a[href],
+button:not(:disabled),
+summary,
+select:not(:disabled),
+label:has(input[type="checkbox"]),
+label:has(input[type="radio"]),
+label:has(input[type="file"]),
+[role="button"]:not([aria-disabled="true"]),
+[role="tab"],
+[role="menuitem"] {
+  cursor: pointer;
+}
+
+button:disabled,
+select:disabled,
+[aria-disabled="true"] {
+  cursor: not-allowed;
+}
+
+.rich-text {
+  overflow-wrap: anywhere;
+}
+
+.rich-text h1 {
+  font-size: 1.5rem;
+  font-weight: 700;
+}
+
+.rich-text h2 {
+  font-size: 1.25rem;
+  font-weight: 700;
+}
+
+.rich-text h3 {
+  font-size: 1.1rem;
+  font-weight: 700;
+}
+
+.rich-text p,
+.rich-text ul,
+.rich-text ol,
+.rich-text blockquote,
+.rich-text table {
+  margin: 0.6rem 0;
+}
+
+.rich-text ul {
+  list-style: disc;
+  padding-inline-start: 1.25rem;
+}
+
+.rich-text ol {
+  list-style: decimal;
+  padding-inline-start: 1.25rem;
+}
+
+.rich-text blockquote {
+  border-inline-start: 3px solid var(--line);
+  padding-inline-start: 0.75rem;
+}
+
+.rich-text a {
+  color: var(--brand-green);
+  text-decoration: underline;
+}
+
+.rich-text table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.rich-text td,
+.rich-text th {
+  border: 1px solid var(--line);
+  padding: 0.4rem 0.5rem;
+  vertical-align: top;
+}
+
+.rich-text th {
+  background: var(--canvas-muted);
+  font-weight: 700;
+}
+
+.rich-text hr {
+  border: 0;
+  border-top: 1px solid var(--line);
+  margin: 1rem 0;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto;
+  }
+}

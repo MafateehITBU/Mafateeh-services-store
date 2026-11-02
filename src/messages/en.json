@@ -1,0 +1,92 @@
+{
+  "Metadata": {
+    "title": "Mafateeh Store",
+    "description": "Digital services from Mafateeh Group."
+  },
+  "Header": {
+    "account": "Account",
+    "cart": "Cart",
+    "search": "Search",
+    "menu": "Menu",
+    "logoAlt": "Mafateeh"
+  },
+  "Language": {
+    "label": "Language",
+    "en": "EN",
+    "ar": "AR",
+    "englishName": "English",
+    "arabicName": "العربية",
+    "switchTo": "Switch language to {language}"
+  },
+  "Menu": {
+    "title": "Browse",
+    "home": "Home",
+    "categories": "Categories",
+    "close": "Close menu",
+    "emptyTitle": "No categories yet",
+    "emptyBody": "Categories published from the dashboard will appear here.",
+    "unavailableTitle": "Categories are unavailable",
+    "unavailableBody": "Please try again in a moment.",
+    "expand": "Show subcategories for {name}",
+    "collapse": "Hide subcategories for {name}"
+  },
+  "Search": {
+    "title": "Search",
+    "placeholder": "Search services",
+    "clear": "Clear search",
+    "close": "Close search",
+    "emptyTitle": "Search is ready",
+    "emptyBody": "Service results will appear here once the catalog is connected."
+  },
+  "Account": {
+    "title": "Sign in",
+    "intro": "Enter your email to continue. No password is required.",
+    "emailLabel": "Email",
+    "emailPlaceholder": "name@example.com",
+    "continue": "Continue",
+    "close": "Close sign in",
+    "invalidEmail": "Enter a valid email address.",
+    "notConnected": "Email sign-in is not connected yet."
+  },
+  "Cart": {
+    "title": "Cart",
+    "close": "Close cart",
+    "emptyTitle": "Your cart is empty",
+    "emptyBody": "Services you add will appear here.",
+    "continueShopping": "Continue shopping",
+    "countLabel": "{count, plural, one {# item} other {# items}}"
+  },
+  "Footer": {
+    "description": "Mafateeh combines marketing, technology, and systems to deliver digital services.",
+    "store": "Store",
+    "home": "Home",
+    "company": "Company",
+    "about": "About",
+    "services": "Services",
+    "contact": "Contact",
+    "contactInfo": "Contact",
+    "address": "Address",
+    "phone": "Phone",
+    "email": "Email",
+    "hours": "Hours",
+    "rights": "© {year} Mafateeh Group. All rights reserved.",
+    "privacy": "Privacy Policy",
+    "terms": "Terms and Conditions",
+    "payments": "Payments",
+    "paymentsReserved": "Payment methods will be shown here."
+  },
+  "WhatsApp": {
+    "label": "Contact Mafateeh on WhatsApp"
+  },
+  "Home": {
+    "eyebrow": "Mafateeh",
+    "title": "Digital services",
+    "message": "The storefront is ready. Published services will appear here.",
+    "categoriesTitle": "Service categories"
+  },
+  "NotFound": {
+    "title": "Page not found",
+    "body": "This page is not available.",
+    "home": "Back to the store"
+  }
+}

@@ -1,0 +1,23 @@
+# Local development database only. Do not reuse these credentials outside this machine.
+services:
+  postgres:
+    image: postgres:16
+    container_name: mafateeh-postgres
+    restart: unless-stopped
+    ports:
+      - "5432:5432"
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: mafateeh_store
+    volumes:
+      - mafateeh_postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d mafateeh_store"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+
+volumes:
+  mafateeh_postgres_data:

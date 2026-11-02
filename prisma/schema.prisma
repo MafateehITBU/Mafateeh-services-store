@@ -1,0 +1,572 @@
+// Mafateeh Store relational schema.
+// Money uses Decimal(12, 3) so Jordanian dinar fils and other 3-decimal
+// currencies are exact. Currency codes are ISO 4217, stored as varchar(3)
+// rather than char(3) so PostgreSQL does not blank-pad them.
+// Ratings, stock-style quantities, loyalty signs, and "both locales exist"
+// rules are enforced when those features are implemented. This schema does
+// not store passwords, plaintext OTP codes, or card data.
+
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+enum Locale {
+  EN
+  AR
+}
+
+enum UserRole {
+  CUSTOMER
+  ADMIN
+  SUPER_ADMIN
+}
+
+enum AccountStatus {
+  ACTIVE
+  DEACTIVATED
+  SUSPENDED
+}
+
+enum OtpPurpose {
+  LOGIN
+  CHANGE_EMAIL
+}
+
+enum BannerPlacement {
+  HOME_HERO
+  HOME_PROMO
+}
+
+enum HomeSectionType {
+  FEATURED_CATEGORIES
+  FEATURED_SERVICES
+  CATEGORY_SERVICES
+  CUSTOM_SERVICES
+}
+
+enum OrderStatus {
+  PENDING_PAYMENT
+  PAID
+  PROCESSING
+  COMPLETED
+  CANCELLED
+  REFUNDED
+}
+
+enum PaymentStatus {
+  PENDING
+  PROCESSING
+  PAID
+  FAILED
+  REFUNDED
+}
+
+enum PaymentProvider {
+  MEPS
+}
+
+enum PaymentAttemptStatus {
+  CREATED
+  PENDING
+  SUCCEEDED
+  FAILED
+  CANCELLED
+}
+
+enum ReviewStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+enum LoyaltyTransactionType {
+  EARN
+  REDEEM
+  ADJUST
+  EXPIRE
+}
+
+/// Customers stay passwordless and will use email OTP.
+/// Administrators store a scrypt hash in passwordHash, never a plaintext password.
+/// Store email in lowercase before insert; the unique index is case-sensitive.
+model User {
+  id                 String        @id @default(uuid()) @db.Uuid
+  email              String        @unique
+  passwordHash       String?
+  firstName          String?
+  lastName           String?
+  phone              String?
+  avatarUrl          String?
+  role               UserRole      @default(CUSTOMER)
+  status             AccountStatus @default(ACTIVE)
+  emailVerifiedAt    DateTime?
+  profileCompletedAt DateTime?
+  deactivatedAt      DateTime?
+  createdAt          DateTime      @default(now())
+  updatedAt          DateTime      @updatedAt
+
+  cart          Cart?
+  orders        Order[]
+  reviews       Review[]
+  wishlistItems WishlistItem[]
+  notifications Notification[]
+  loyaltyWallet LoyaltyWallet?
+  auditLogs     AdminAuditLog[]
+
+  @@index([role])
+  @@index([status])
+  @@index([phone])
+}
+
+/// One-time code challenge. codeHash is a hash, never the code itself.
+model EmailOtp {
+  id             String     @id @default(uuid()) @db.Uuid
+  email          String
+  codeHash       String
+  purpose        OtpPurpose
+  expiresAt      DateTime
+  consumedAt     DateTime?
+  failedAttempts Int        @default(0)
+  createdAt      DateTime   @default(now())
+
+  @@index([email, purpose, expiresAt])
+  @@index([expiresAt])
+}
+
+model Category {
+  id             String   @id @default(uuid()) @db.Uuid
+  parentId       String?  @db.Uuid
+  slug           String   @unique
+  iconName       String?
+  iconImageUrl   String?
+  bannerImageUrl String
+  isActive       Boolean  @default(true)
+  sortOrder      Int      @default(0)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  parent       Category?             @relation("CategoryHierarchy", fields: [parentId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+  children     Category[]            @relation("CategoryHierarchy")
+  translations CategoryTranslation[]
+  services     Service[]
+  homeSections HomeSection[]
+
+  @@index([parentId, isActive, sortOrder])
+  @@index([isActive, sortOrder])
+}
+
+model CategoryTranslation {
+  id             String  @id @default(uuid()) @db.Uuid
+  categoryId     String  @db.Uuid
+  locale         Locale
+  title          String
+  description    String?
+  seoTitle       String?
+  seoDescription String?
+
+  category Category @relation(fields: [categoryId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+
+  @@unique([categoryId, locale])
+  @@index([locale])
+}
+
+model Service {
+  id             String    @id @default(uuid()) @db.Uuid
+  categoryId     String    @db.Uuid
+  slug           String    @unique
+  sku            String?   @unique
+  /// Null while the service is still a draft. Publishing requires a base64 data URL.
+  coverImageUrl  String?
+  basePrice      Decimal   @db.Decimal(12, 3)
+  compareAtPrice Decimal?  @db.Decimal(12, 3)
+  currency       String    @db.VarChar(3)
+  isActive       Boolean   @default(true)
+  isFeatured     Boolean   @default(false)
+  sortOrder      Int       @default(0)
+  publishedAt    DateTime?
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+
+  category         Category             @relation(fields: [categoryId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+  translations     ServiceTranslation[]
+  images           ServiceImage[]
+  variants         ServiceVariant[]
+  cartItems        CartItem[]
+  orderItems       OrderItem[]
+  reviews          Review[]
+  wishlistItems    WishlistItem[]
+  homeSectionLinks HomeSectionService[]
+
+  @@index([categoryId, isActive, sortOrder])
+  @@index([isFeatured, isActive, sortOrder])
+}
+
+/// detailedDescription stores a TipTap JSON document.
+model ServiceTranslation {
+  id                  String  @id @default(uuid()) @db.Uuid
+  serviceId           String  @db.Uuid
+  locale              Locale
+  name                String
+  shortDescription    String
+  detailedDescription Json    @db.JsonB
+  seoTitle            String?
+  seoDescription      String?
+
+  service Service @relation(fields: [serviceId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+
+  @@unique([serviceId, locale])
+  @@index([locale])
+}
+
+model ServiceImage {
+  id        String   @id @default(uuid()) @db.Uuid
+  serviceId String   @db.Uuid
+  imageUrl  String
+  altText   String
+  sortOrder Int      @default(0)
+  createdAt DateTime @default(now())
+
+  service Service @relation(fields: [serviceId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+
+  @@index([serviceId, sortOrder])
+}
+
+model ServiceVariant {
+  id             String   @id @default(uuid()) @db.Uuid
+  serviceId      String   @db.Uuid
+  sku            String   @unique
+  price          Decimal  @db.Decimal(12, 3)
+  compareAtPrice Decimal? @db.Decimal(12, 3)
+  currency       String   @db.VarChar(3)
+  isActive       Boolean  @default(true)
+  sortOrder      Int      @default(0)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  service      Service                     @relation(fields: [serviceId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+  translations ServiceVariantTranslation[]
+  cartItems    CartItem[]
+  orderItems   OrderItem[]
+
+  @@index([serviceId, isActive, sortOrder])
+}
+
+model ServiceVariantTranslation {
+  id          String  @id @default(uuid()) @db.Uuid
+  variantId   String  @db.Uuid
+  locale      Locale
+  name        String
+  description String?
+
+  variant ServiceVariant @relation(fields: [variantId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+
+  @@unique([variantId, locale])
+  @@index([locale])
+}
+
+model StoreBanner {
+  id              String          @id @default(uuid()) @db.Uuid
+  placement       BannerPlacement
+  desktopImageUrl String
+  mobileImageUrl  String?
+  linkUrl         String?
+  isActive        Boolean         @default(true)
+  sortOrder       Int             @default(0)
+  startsAt        DateTime?
+  endsAt          DateTime?
+  createdAt       DateTime        @default(now())
+  updatedAt       DateTime        @updatedAt
+
+  translations StoreBannerTranslation[]
+
+  @@index([placement, isActive, sortOrder])
+  @@index([startsAt, endsAt])
+}
+
+model StoreBannerTranslation {
+  id          String  @id @default(uuid()) @db.Uuid
+  bannerId    String  @db.Uuid
+  locale      Locale
+  title       String
+  subtitle    String?
+  buttonLabel String?
+  altText     String
+
+  banner StoreBanner @relation(fields: [bannerId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+
+  @@unique([bannerId, locale])
+  @@index([locale])
+}
+
+model HomeSection {
+  id         String          @id @default(uuid()) @db.Uuid
+  key        String          @unique
+  type       HomeSectionType
+  categoryId String?         @db.Uuid
+  isActive   Boolean         @default(true)
+  sortOrder  Int             @default(0)
+  maxItems   Int             @default(8)
+  createdAt  DateTime        @default(now())
+  updatedAt  DateTime        @updatedAt
+
+  category     Category?                @relation(fields: [categoryId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+  translations HomeSectionTranslation[]
+  services     HomeSectionService[]
+
+  @@index([isActive, sortOrder])
+  @@index([type])
+  @@index([categoryId])
+}
+
+model HomeSectionTranslation {
+  id        String  @id @default(uuid()) @db.Uuid
+  sectionId String  @db.Uuid
+  locale    Locale
+  title     String
+  subtitle  String?
+
+  section HomeSection @relation(fields: [sectionId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+
+  @@unique([sectionId, locale])
+  @@index([locale])
+}
+
+model HomeSectionService {
+  id        String @id @default(uuid()) @db.Uuid
+  sectionId String @db.Uuid
+  serviceId String @db.Uuid
+  sortOrder Int    @default(0)
+
+  section HomeSection @relation(fields: [sectionId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+  service Service     @relation(fields: [serviceId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+
+  @@unique([sectionId, serviceId])
+  @@index([sectionId, sortOrder])
+  @@index([serviceId])
+}
+
+model Cart {
+  id        String   @id @default(uuid()) @db.Uuid
+  userId    String   @unique @db.Uuid
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  user  User       @relation(fields: [userId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+  items CartItem[]
+}
+
+/// quantity must be a positive integer in the cart service.
+/// PostgreSQL treats nulls as distinct in this unique key, so two lines for
+/// the same service with a null variantId are not rejected by the database.
+/// The cart service must collapse those lines. Prefer NULLS NOT DISTINCT
+/// when the initial migration is created.
+model CartItem {
+  id        String   @id @default(uuid()) @db.Uuid
+  cartId    String   @db.Uuid
+  serviceId String   @db.Uuid
+  variantId String?  @db.Uuid
+  quantity  Int
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  cart    Cart            @relation(fields: [cartId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+  service Service         @relation(fields: [serviceId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+  variant ServiceVariant? @relation(fields: [variantId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+
+  @@unique([cartId, serviceId, variantId])
+  @@index([serviceId])
+  @@index([variantId])
+}
+
+model Order {
+  id            String        @id @default(uuid()) @db.Uuid
+  orderNumber   String        @unique
+  userId        String        @db.Uuid
+  status        OrderStatus   @default(PENDING_PAYMENT)
+  paymentStatus PaymentStatus @default(PENDING)
+  currency      String        @db.VarChar(3)
+  subtotal      Decimal       @db.Decimal(12, 3)
+  discount      Decimal       @default(0) @db.Decimal(12, 3)
+  tax           Decimal       @default(0) @db.Decimal(12, 3)
+  total         Decimal       @db.Decimal(12, 3)
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
+  completedAt   DateTime?
+
+  user                User                 @relation(fields: [userId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+  items               OrderItem[]
+  paymentAttempts     PaymentAttempt[]
+  loyaltyTransactions LoyaltyTransaction[]
+
+  @@index([userId, createdAt])
+  @@index([status, createdAt])
+  @@index([paymentStatus])
+}
+
+/// Names and prices are snapshots. Later edits to a service must not change this row.
+/// quantity must be a positive integer. unitPrice and lineTotal are Decimal.
+model OrderItem {
+  id                  String   @id @default(uuid()) @db.Uuid
+  orderId             String   @db.Uuid
+  serviceId           String?  @db.Uuid
+  variantId           String?  @db.Uuid
+  serviceNameSnapshot String
+  variantNameSnapshot String?
+  skuSnapshot         String?
+  unitPrice           Decimal  @db.Decimal(12, 3)
+  currency            String   @db.VarChar(3)
+  quantity            Int
+  lineTotal           Decimal  @db.Decimal(12, 3)
+  createdAt           DateTime @default(now())
+
+  order   Order           @relation(fields: [orderId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+  service Service?        @relation(fields: [serviceId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+  variant ServiceVariant? @relation(fields: [variantId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+
+  @@index([orderId])
+  @@index([serviceId])
+  @@index([variantId])
+}
+
+/// MEPS attempt. Never store card numbers, CVV, or other cardholder secrets
+/// in requestMetadata or responseMetadata.
+model PaymentAttempt {
+  id                   String               @id @default(uuid()) @db.Uuid
+  orderId              String               @db.Uuid
+  provider             PaymentProvider
+  status               PaymentAttemptStatus @default(CREATED)
+  amount               Decimal              @db.Decimal(12, 3)
+  currency             String               @db.VarChar(3)
+  providerReference    String?
+  transactionReference String?
+  idempotencyKey       String?              @unique
+  requestMetadata      Json?                @db.JsonB
+  responseMetadata     Json?                @db.JsonB
+  paidAt               DateTime?
+  createdAt            DateTime             @default(now())
+  updatedAt            DateTime             @updatedAt
+
+  order Order @relation(fields: [orderId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+
+  @@index([orderId, createdAt])
+  @@index([provider, status])
+  @@index([providerReference])
+  @@index([transactionReference])
+}
+
+/// rating is an integer from 1 to 5. Public ratings use status APPROVED only.
+/// verifiedPurchase is set from a paid order, not from user input.
+model Review {
+  id               String       @id @default(uuid()) @db.Uuid
+  userId           String       @db.Uuid
+  serviceId        String       @db.Uuid
+  rating           Int
+  comment          String
+  status           ReviewStatus @default(PENDING)
+  verifiedPurchase Boolean      @default(false)
+  createdAt        DateTime     @default(now())
+  updatedAt        DateTime     @updatedAt
+
+  user    User    @relation(fields: [userId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+  service Service @relation(fields: [serviceId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+
+  @@unique([userId, serviceId])
+  @@index([serviceId, status])
+  @@index([userId])
+}
+
+model WishlistItem {
+  id        String   @id @default(uuid()) @db.Uuid
+  userId    String   @db.Uuid
+  serviceId String   @db.Uuid
+  createdAt DateTime @default(now())
+
+  user    User    @relation(fields: [userId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+  service Service @relation(fields: [serviceId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+
+  @@unique([userId, serviceId])
+  @@index([serviceId])
+}
+
+/// type is a stable application code. Allowed values will be defined with the notification feature.
+model Notification {
+  id        String   @id @default(uuid()) @db.Uuid
+  userId    String   @db.Uuid
+  type      String
+  isRead    Boolean  @default(false)
+  createdAt DateTime @default(now())
+
+  user         User                      @relation(fields: [userId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+  translations NotificationTranslation[]
+
+  @@index([userId, isRead, createdAt])
+  @@index([type])
+}
+
+model NotificationTranslation {
+  id             String @id @default(uuid()) @db.Uuid
+  notificationId String @db.Uuid
+  locale         Locale
+  title          String
+  message        String
+
+  notification Notification @relation(fields: [notificationId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+
+  @@unique([notificationId, locale])
+  @@index([locale])
+}
+
+/// pointsBalance must not go negative. Enforce that in the same transaction
+/// that inserts the matching LoyaltyTransaction.
+model LoyaltyWallet {
+  id            String   @id @default(uuid()) @db.Uuid
+  userId        String   @unique @db.Uuid
+  pointsBalance Int      @default(0)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  user         User                 @relation(fields: [userId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+  transactions LoyaltyTransaction[]
+}
+
+/// points is signed: EARN is positive, REDEEM and EXPIRE are negative, ADJUST may be either.
+model LoyaltyTransaction {
+  id          String                 @id @default(uuid()) @db.Uuid
+  walletId    String                 @db.Uuid
+  type        LoyaltyTransactionType
+  points      Int
+  description String
+  orderId     String?                @db.Uuid
+  createdAt   DateTime               @default(now())
+
+  wallet LoyaltyWallet @relation(fields: [walletId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+  order  Order?        @relation(fields: [orderId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+
+  @@index([walletId, createdAt])
+  @@index([orderId])
+  @@index([type])
+}
+
+/// Administrative history. beforeData and afterData must not contain secrets,
+/// OTP hashes, or payment card data.
+model AdminAuditLog {
+  id         String   @id @default(uuid()) @db.Uuid
+  actorId    String   @db.Uuid
+  action     String
+  entityType String
+  entityId   String   @db.Uuid
+  beforeData Json?    @db.JsonB
+  afterData  Json?    @db.JsonB
+  createdAt  DateTime @default(now())
+
+  actor User @relation(fields: [actorId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+
+  @@index([actorId, createdAt])
+  @@index([entityType, entityId])
+  @@index([createdAt])
+}
