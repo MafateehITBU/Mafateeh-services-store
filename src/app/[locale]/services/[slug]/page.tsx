@@ -1,12 +1,20 @@
-import { ServiceCard } from "@/components/storefront/service-card";
+import { CategoryServiceCard } from "@/components/storefront/category-service-card";
+import { ReviewForm } from "@/components/storefront/review-form";
+import { ReviewSummary } from "@/components/storefront/review-summary";
+import { ServiceGallery } from "@/components/storefront/service-gallery";
+import { ServiceStars } from "@/components/storefront/service-stars";
+import { AddToCartButton } from "@/components/storefront/add-to-cart-button";
 import { StoredImage } from "@/components/ui/stored-image";
 import { RichTextView } from "@/features/services/rich-text-view";
 import { getPublicService } from "@/features/services/get-public-services";
 import { Link } from "@/i18n/navigation";
 import { routing, type AppLocale } from "@/i18n/routing";
+import { readSignedInUser } from "@/server/auth/storefront-user";
+import { hasUserReview } from "@/server/storefront/reviews";
 import { hasLocale } from "next-intl";
 import { getTranslations, setRequestLocale } from "next-intl/server";
 import type { Metadata } from "next";
+import { UserRound } from "lucide-react";
 import { connection } from "next/server";
 import { notFound } from "next/navigation";
 
@@ -51,11 +59,20 @@ export default async function ServicePage({ params }: PageProps) {
 
   setRequestLocale(locale);
   const language = locale as AppLocale;
-  const [service, t] = await Promise.all([getPublicService(slug, language), getTranslations("Store")]);
+  const [service, t, user] = await Promise.all([getPublicService(slug, language), getTranslations("Store"), readSignedInUser()]);
 
   if (!service) {
     notFound();
   }
+
+  const reviewed = user ? await hasUserReview(user.id, service.id) : false;
+  const showReviewForm = Boolean(user) && !reviewed;
+  const starValue = service.reviewCount > 0 && service.ratingAverage != null ? service.ratingAverage : 4;
+  const dateFormat = new Intl.DateTimeFormat(language === "ar" ? "ar" : "en-GB", {
+    day: "numeric",
+    month: "numeric",
+    year: "numeric",
+  });
 
   return (
     <article className="mx-auto max-w-[var(--container)] px-4 py-8 md:px-6">
@@ -67,52 +84,88 @@ export default async function ServicePage({ params }: PageProps) {
         <span>{service.name}</span>
       </nav>
       <div className="mt-6 grid gap-8 lg:grid-cols-[minmax(0,1.1fr)_minmax(18rem,0.9fr)]">
-        <div className="space-y-3">
-          <StoredImage src={service.coverImageUrl} alt={service.name} className="aspect-[4/3] w-full rounded-3xl" />
-          {service.gallery.length > 0 ? (
-            <div className="grid grid-cols-4 gap-3">
-              {service.gallery.map((image) => (
-                <StoredImage key={image.id} src={image.imageUrl} alt={image.altText || service.name} className="aspect-square rounded-xl" />
-              ))}
-            </div>
-          ) : null}
-        </div>
+        <ServiceGallery name={service.name} coverImageUrl={service.coverImageUrl} gallery={service.gallery} />
         <div>
-          <p className="text-sm font-semibold text-brand">{service.category.title}</p>
-          <h1 className="mt-2 text-3xl font-bold md:text-4xl">{service.name}</h1>
-          {service.reviewCount > 0 && service.ratingAverage != null ? (
-            <p className="mt-3 text-sm font-semibold text-brand-gold">{t("rating", { rating: service.ratingAverage, count: service.reviewCount })}</p>
-          ) : null}
-          <p className="mt-4 text-2xl font-bold text-brand">{service.price} {service.currency}</p>
+          <h1 className="text-3xl font-bold md:text-4xl">{service.name}</h1>
+          <ServiceStars value={starValue} label={t("stars", { count: Math.round(starValue) })} />
           <p className="mt-4 text-base leading-7 text-muted">{service.shortDescription}</p>
+          <p className="mt-4 text-2xl font-bold text-[#d3122a]">
+            {service.price} <span className="text-lg">{service.currency}</span>
+          </p>
+          <AddToCartButton
+            service={{
+              id: service.id,
+              slug: service.slug,
+              name: service.name,
+              price: service.price,
+              currency: service.currency,
+            }}
+            label={t("addToCart")}
+          />
         </div>
       </div>
-      <section className="mt-10">
-        <h2 className="text-2xl font-bold">{t("description")}</h2>
-        <RichTextView document={service.detailedDescription} dir={locale === "ar" ? "rtl" : "ltr"} className="mt-4 space-y-3 text-base leading-7" />
+      <hr className="mt-10 border-0 border-t border-[#e4e4e4]" />
+      <section className="mt-8">
+        <RichTextView document={service.detailedDescription} dir={locale === "ar" ? "rtl" : "ltr"} className="space-y-3 text-base leading-7" />
       </section>
-      <section className="mt-10">
-        <h2 className="text-2xl font-bold">{t("reviews")}</h2>
-        {service.reviews.length === 0 ? (
-          <p className="mt-3 text-sm text-muted">{t("noReviews")}</p>
-        ) : (
-          <ul className="mt-4 space-y-4">
-            {service.reviews.map((review) => (
-              <li key={review.id} className="rounded-2xl border border-line bg-white p-4">
-                <p className="font-semibold">{review.author || t("customer")}</p>
-                <p className="mt-1 text-sm text-brand-gold">{t("stars", { count: review.rating })}</p>
-                <p className="mt-2 text-sm leading-6">{review.comment}</p>
-              </li>
-            ))}
-          </ul>
-        )}
-      </section>
+      {service.reviews.length > 0 || showReviewForm ? (
+        <section className="mt-10 border-t border-[#e4e4e4] pt-8">
+          {showReviewForm ? <ReviewForm serviceId={service.id} /> : null}
+          {service.reviews.length > 0 ? (
+            <div className={showReviewForm ? "mt-10" : undefined}>
+              <h2 className="text-2xl font-bold">{t("reviews")}</h2>
+              <div className="mt-6">
+                <ReviewSummary
+                  average={service.ratingAverage ?? starValue}
+                  count={service.reviewCount}
+                  counts={service.ratingCounts}
+                  basedOn={t("basedOn", { count: service.reviewCount })}
+                  recommendedLabel={t("recommended")}
+                />
+              </div>
+              <ul className="mt-8">
+                {service.reviews.map((review) => (
+                  <li key={review.id} className="border-t border-[#ececec] py-5">
+                    <div className="flex items-start justify-between gap-4">
+                      <div className="flex items-center gap-3">
+                        {review.avatarUrl ? (
+                          <StoredImage src={review.avatarUrl} alt="" className="size-10 shrink-0 rounded-full" />
+                        ) : (
+                          <span className="inline-flex size-10 shrink-0 items-center justify-center rounded-full bg-[#e7f5ec] text-brand">
+                            <UserRound aria-hidden="true" className="size-5" />
+                          </span>
+                        )}
+                        <div>
+                          <p className="font-bold">{review.author || t("customer")}</p>
+                          <ServiceStars value={review.rating} label={t("stars", { count: review.rating })} className="mt-1" />
+                        </div>
+                      </div>
+                      <time dateTime={review.createdAt} className="text-sm text-muted">
+                        {dateFormat.format(new Date(review.createdAt))}
+                      </time>
+                    </div>
+                    {review.comment ? <p className="mt-3 text-sm leading-6">{review.comment}</p> : null}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          ) : null}
+        </section>
+      ) : null}
       {service.related.length > 0 ? (
         <section className="mt-10">
-          <h2 className="text-2xl font-bold">{t("related")}</h2>
-          <div className="mt-6 grid grid-cols-2 gap-4 lg:grid-cols-4">
+          <h2 className="text-2xl font-bold">{t("similar")}</h2>
+          <div className="mt-6 grid grid-cols-1 gap-4 min-[400px]:grid-cols-2 lg:grid-cols-3">
             {service.related.map((item) => (
-              <ServiceCard key={item.id} service={item} />
+              <CategoryServiceCard
+                key={item.id}
+                service={{ ...item, categoryTitle: service.category.title }}
+                labels={{
+                  addToCart: t("addToCart"),
+                  featured: t("featured"),
+                  rating: t("rating", { rating: item.ratingAverage ?? 0, count: item.reviewCount }),
+                }}
+              />
             ))}
           </div>
         </section>

@@ -316,7 +316,7 @@ export async function getPublicService(slug: string, locale: PublicLocale) {
           rating: true,
           comment: true,
           createdAt: true,
-          user: { select: { firstName: true, lastName: true } },
+          user: { select: { firstName: true, lastName: true, avatarUrl: true } },
         },
       },
       category: { select: { slug: true, translations: { select: { locale: true, title: true } } } },
@@ -329,15 +329,21 @@ export async function getPublicService(slug: string, locale: PublicLocale) {
     return null;
   }
 
-  const [ratings, relatedRows] = await Promise.all([
+  const [ratings, ratingRows, relatedRows] = await Promise.all([
     approvedRatings([service.id]),
+    prisma.review.groupBy({
+      by: ["rating"],
+      where: { serviceId: service.id, status: "APPROVED" },
+      _count: { _all: true },
+    }),
     prisma.service.findMany({
       where: { ...publishedWhere, categoryId: service.categoryId, id: { not: service.id } },
       orderBy: [{ sortOrder: "asc" }, { publishedAt: "desc" }],
-      take: 4,
+      take: 3,
       select: {
         id: true,
         slug: true,
+        isFeatured: true,
         coverImageUrl: true,
         basePrice: true,
         currency: true,
@@ -346,6 +352,13 @@ export async function getPublicService(slug: string, locale: PublicLocale) {
     }),
   ]);
   const relatedRatings = await approvedRatings(relatedRows.map((row) => row.id));
+  const ratingCounts = [0, 0, 0, 0, 0];
+
+  for (const row of ratingRows) {
+    if (row.rating >= 1 && row.rating <= 5) {
+      ratingCounts[row.rating - 1] = row._count._all;
+    }
+  }
 
   return {
     id: service.id,
@@ -357,17 +370,19 @@ export async function getPublicService(slug: string, locale: PublicLocale) {
     seoDescription: translation.seoDescription,
     coverImageUrl: service.coverImageUrl,
     gallery: service.images,
-    price: service.basePrice.toString(),
+    price: formatAmount(service.basePrice.toString(), locale),
     currency: service.currency,
     category: { slug: service.category.slug, title: category.title },
     ratingAverage: ratings.get(service.id)?.ratingAverage ?? null,
     reviewCount: ratings.get(service.id)?.reviewCount ?? 0,
+    ratingCounts,
     reviews: service.reviews.map((review) => ({
       id: review.id,
       rating: review.rating,
       comment: review.comment,
       createdAt: review.createdAt.toISOString(),
       author: [review.user.firstName, review.user.lastName].filter(Boolean).join(" "),
+      avatarUrl: review.user.avatarUrl?.startsWith("data:image/") ? review.user.avatarUrl : null,
     })),
     related: relatedRows.flatMap((row) => {
       const copy = row.translations.find((item) => item.locale === language) ?? row.translations[0];
@@ -383,8 +398,9 @@ export async function getPublicService(slug: string, locale: PublicLocale) {
           name: copy.name,
           shortDescription: copy.shortDescription,
           coverImageUrl: row.coverImageUrl,
-          price: row.basePrice.toString(),
+          price: formatAmount(row.basePrice.toString(), locale),
           currency: row.currency,
+          isFeatured: row.isFeatured,
           ratingAverage: relatedRatings.get(row.id)?.ratingAverage ?? null,
           reviewCount: relatedRatings.get(row.id)?.reviewCount ?? 0,
         },

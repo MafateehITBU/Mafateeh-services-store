@@ -18,11 +18,10 @@ type CartInput = Omit<CartLine, "quantity">;
 type CartContextValue = {
   items: CartLine[];
   count: number;
-  open: boolean;
+  ready: boolean;
   addItem: (item: CartInput) => void;
   removeItem: (id: string) => void;
-  toggle: () => void;
-  close: () => void;
+  setQuantity: (id: string, quantity: number) => void;
 };
 
 const CartContext = createContext<CartContextValue | null>(null);
@@ -73,9 +72,17 @@ function withItem(items: CartLine[], item: CartInput) {
   );
 }
 
+function changeQuantity(items: CartLine[], id: string, quantity: number) {
+  if (quantity < 1) {
+    return items.filter((line) => line.id !== id);
+  }
+
+  return items.map((line) => (line.id === id ? { ...line, quantity: Math.min(quantity, 99) } : line));
+}
+
 export function CartProvider({ children }: { children: React.ReactNode }) {
   const [items, setItems] = useState<CartLine[]>([]);
-  const [open, setOpen] = useState(false);
+  const [ready, setReady] = useState(false);
   const hydrated = useRef(false);
 
   useEffect(() => {
@@ -85,13 +92,14 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
 
     hydrated.current = true;
     setItems(readCart());
+    setReady(true);
   }, []);
 
   const value = useMemo<CartContextValue>(
     () => ({
       items,
       count: items.reduce((total, line) => total + line.quantity, 0),
-      open,
+      ready,
       addItem(item) {
         setItems((current) => {
           const base = hydrated.current ? current : readCart();
@@ -100,7 +108,7 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
           writeCart(next);
           return next;
         });
-        setOpen(true);
+        setReady(true);
       },
       removeItem(id) {
         setItems((current) => {
@@ -110,15 +118,20 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
           writeCart(next);
           return next;
         });
+        setReady(true);
       },
-      toggle() {
-        setOpen((current) => !current);
-      },
-      close() {
-        setOpen(false);
+      setQuantity(id, quantity) {
+        setItems((current) => {
+          const base = hydrated.current ? current : readCart();
+          hydrated.current = true;
+          const next = changeQuantity(base, id, quantity);
+          writeCart(next);
+          return next;
+        });
+        setReady(true);
       },
     }),
-    [items, open],
+    [items, ready],
   );
 
   return <CartContext.Provider value={value}>{children}</CartContext.Provider>;
