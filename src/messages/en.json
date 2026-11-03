@@ -8,7 +8,8 @@
     "cart": "Cart",
     "search": "Search",
     "menu": "Menu",
-    "logoAlt": "Mafateeh"
+    "logoAlt": "Mafateeh",
+    "comingSoon": "Coming soon"
   },
   "Language": {
     "label": "Language",
@@ -19,7 +20,7 @@
     "switchTo": "Switch language to {language}"
   },
   "Menu": {
-    "title": "Browse",
+    "title": "Categories",
     "home": "Home",
     "categories": "Categories",
     "close": "Close menu",
@@ -35,8 +36,10 @@
     "placeholder": "Search services",
     "clear": "Clear search",
     "close": "Close search",
-    "emptyTitle": "Search is ready",
-    "emptyBody": "Service results will appear here once the catalog is connected."
+    "hint": "Type at least two letters to search published services.",
+    "loading": "Searching…",
+    "none": "No published services match that search.",
+    "error": "Search is unavailable right now."
   },
   "Account": {
     "title": "Sign in",
@@ -54,7 +57,8 @@
     "emptyTitle": "Your cart is empty",
     "emptyBody": "Services you add will appear here.",
     "continueShopping": "Continue shopping",
-    "countLabel": "{count, plural, one {# item} other {# items}}"
+    "countLabel": "{count, plural, one {# item} other {# items}}",
+    "remove": "Remove"
   },
   "Footer": {
     "description": "Mafateeh combines marketing, technology, and systems to deliver digital services.",
@@ -78,11 +82,52 @@
   "WhatsApp": {
     "label": "Contact Mafateeh on WhatsApp"
   },
-  "Home": {
-    "eyebrow": "Mafateeh",
-    "title": "Digital services",
-    "message": "The storefront is ready. Published services will appear here.",
-    "categoriesTitle": "Service categories"
+  "Store": {
+    "categoriesTitle": "Explore Our Solutions",
+    "categoriesSubtitle": "Discover digital services designed to help your business grow, connect, and work smarter.",
+    "categoryPrevious": "Previous categories",
+    "categoryNext": "Next categories",
+    "categoryPage": "Show category page {index}",
+    "emptyTitle": "The catalog is being prepared",
+    "emptyBody": "Published categories and services will appear here.",
+    "home": "Home",
+    "breadcrumbs": "Breadcrumb",
+    "categoryEmpty": "No services available in this category yet.",
+    "description": "Description",
+    "reviews": "Reviews",
+    "noReviews": "No approved reviews yet.",
+    "customer": "Customer",
+    "related": "Related services",
+    "rating": "{rating} · {count} reviews",
+    "stars": "{count} of 5",
+    "heroLabel": "Featured banners",
+    "promoLabel": "Promotions",
+    "previous": "Previous banner",
+    "next": "Next banner",
+    "slide": "Show banner {index}",
+    "brandMark": "MAFATEEH",
+    "sortLabel": "Sort",
+    "sortFeatured": "Featured",
+    "sortNewest": "Newest",
+    "sortPriceAsc": "Price: low to high",
+    "sortPriceDesc": "Price: high to low",
+    "sortRating": "Highest rated",
+    "results": "{title} — Results ({count})",
+    "addToCart": "Add to cart",
+    "featured": "Featured",
+    "pagePrevious": "Previous page",
+    "pageNext": "Next page",
+    "pageLabel": "Page"
+  },
+  "Testimonials": {
+    "title": "What Our Customers Say",
+    "empty": "Approved customer reviews will appear here.",
+    "preview": "Preview — example content",
+    "previous": "Previous reviews",
+    "next": "Next reviews",
+    "page": "Show review page {index}",
+    "stars": "{count} of 5 stars",
+    "read": "Read review"
   },
   "NotFound": {
     "title": "Page not found",

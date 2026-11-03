@@ -2,11 +2,10 @@
 
 import { BrandLogo } from "@/components/layout/brand-logo";
 import { LanguageSwitcher } from "@/components/layout/language-switcher";
-import { AccountModal } from "@/components/storefront/account-modal";
 import { CartDrawer } from "@/components/storefront/cart-drawer";
 import { CategoryDrawer } from "@/components/storefront/category-drawer";
 import { SearchPanel } from "@/components/storefront/search-panel";
-import { Badge } from "@/components/ui/badge";
+import { useCart } from "@/features/cart/cart-provider";
 import type { PublicCategory } from "@/features/categories/types";
 import { Link } from "@/i18n/navigation";
 import { Menu, Search, ShoppingBag, UserRound } from "lucide-react";
@@ -18,24 +17,25 @@ type OverlayName = "menu" | "search" | "account" | "cart" | null;
 type SiteHeaderProps = {
   categories: PublicCategory[];
   unavailable: boolean;
-  cartItemCount?: number;
 };
 
-export function SiteHeader({
-  categories,
-  unavailable,
-  cartItemCount = 0,
-}: SiteHeaderProps) {
+export function SiteHeader({ categories, unavailable }: SiteHeaderProps) {
   const t = useTranslations("Header");
-  const cartLabel = useTranslations("Cart");
+  const cart = useCart();
   const [overlay, setOverlay] = useState<OverlayName>(null);
 
   function toggle(name: Exclude<OverlayName, null>) {
+    cart.close();
     setOverlay((current) => (current === name ? null : name));
   }
 
   function close() {
     setOverlay(null);
+  }
+
+  function toggleCart() {
+    setOverlay(null);
+    cart.toggle();
   }
 
   return (
@@ -48,26 +48,22 @@ export function SiteHeader({
           borderRadius: "0 0 var(--radius-header) var(--radius-header)",
         }}
       >
-        <div className="mx-auto grid h-[4.5rem] w-full max-w-[var(--container)] grid-cols-[1fr_auto_1fr] items-center gap-2 px-3 md:h-[5.5rem] md:px-6">
+        <div className="mx-auto grid h-[var(--header-height)] w-full max-w-[var(--container)] grid-cols-[1fr_auto_1fr] items-center gap-2 px-3 md:px-6">
           <div className="flex items-center gap-1 justify-self-start md:gap-2">
-            <HeaderAction label={t("account")} onClick={() => toggle("account")}>
-              <UserRound aria-hidden="true" className="size-5" />
-            </HeaderAction>
+            <HeaderPlaceholder label={t("account")} note={t("comingSoon")}>
+              <UserRound aria-hidden="true" className="size-6" />
+            </HeaderPlaceholder>
             <HeaderAction
               label={t("cart")}
-              accessibleName={
-                cartItemCount > 0
-                  ? `${t("cart")}, ${cartLabel("countLabel", { count: cartItemCount })}`
-                  : t("cart")
-              }
-              onClick={() => toggle("cart")}
+              accessibleName={cart.count > 0 ? `${t("cart")}, ${cart.count}` : t("cart")}
+              onClick={toggleCart}
             >
-              <span className="relative">
-                <ShoppingBag aria-hidden="true" className="size-5" />
-                {cartItemCount > 0 ? (
-                  <Badge className="absolute -top-2 -right-3">{cartItemCount}</Badge>
-                ) : null}
-              </span>
+              <ShoppingBag aria-hidden="true" className="size-6" />
+              {cart.count > 0 ? (
+                <span className="absolute top-0.5 right-0.5 inline-flex min-w-4 items-center justify-center rounded-full bg-[#dfb026] px-1 text-[10px] font-bold leading-4 text-[#0c3d1e]">
+                  {cart.count > 99 ? "99+" : cart.count}
+                </span>
+              ) : null}
             </HeaderAction>
           </div>
 
@@ -77,10 +73,10 @@ export function SiteHeader({
 
           <div className="flex items-center justify-end gap-1 justify-self-end md:gap-2">
             <HeaderAction label={t("search")} onClick={() => toggle("search")}>
-              <Search aria-hidden="true" className="size-5" />
+              <Search aria-hidden="true" className="size-6" />
             </HeaderAction>
             <HeaderAction label={t("menu")} onClick={() => toggle("menu")}>
-              <Menu aria-hidden="true" className="size-5" />
+              <Menu aria-hidden="true" className="size-6" />
             </HeaderAction>
             <Suspense fallback={<span className="inline-flex h-10 w-[4.5rem]" />}>
               <LanguageSwitcher />
@@ -96,9 +92,29 @@ export function SiteHeader({
         unavailable={unavailable}
       />
       <SearchPanel open={overlay === "search"} onClose={close} />
-      <AccountModal open={overlay === "account"} onClose={close} />
-      <CartDrawer open={overlay === "cart"} onClose={close} />
+      <CartDrawer open={cart.open} onClose={cart.close} />
     </>
+  );
+}
+
+function HeaderPlaceholder({
+  label,
+  note,
+  children,
+}: {
+  label: string;
+  note: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <span
+      aria-disabled="true"
+      aria-label={`${label}. ${note}`}
+      title={`${label}. ${note}`}
+      className="inline-flex size-11 cursor-not-allowed items-center justify-center rounded-full text-white/80"
+    >
+      {children}
+    </span>
   );
 }
 
@@ -118,12 +134,10 @@ function HeaderAction({
       type="button"
       aria-label={accessibleName ?? label}
       onClick={onClick}
-      className="inline-flex min-h-11 cursor-pointer items-center gap-2 rounded-full px-2 text-white transition hover:bg-white/15 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white md:px-3"
+      title={label}
+      className="relative inline-flex size-11 cursor-pointer items-center justify-center rounded-full text-white transition hover:bg-white/15 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white"
     >
       {children}
-      <span aria-hidden="true" className="hidden text-sm font-semibold md:inline">
-        {label}
-      </span>
     </button>
   );
 }

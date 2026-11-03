@@ -7,13 +7,16 @@ export function StoredImage({
   src,
   alt,
   className,
+  fit = "cover",
+  sizing = "intrinsic",
 }: {
   src: string | null;
   alt: string;
   className?: string;
+  fit?: "cover" | "contain";
+  sizing?: "intrinsic" | "frame";
 }) {
   const [failed, setFailed] = useState(false);
-  const [loaded, setLoaded] = useState(false);
   const stored = Boolean(src?.startsWith("data:image/"));
 
   if (!stored || failed) {
@@ -25,15 +28,17 @@ export function StoredImage({
   }
 
   return (
-    <span className={cn("relative block overflow-hidden bg-canvas-muted", className)}>
-      {loaded ? null : <span className="absolute inset-0 animate-pulse bg-canvas-muted" aria-hidden="true" />}
-      {/* Stored images are base64 data URLs in PostgreSQL, so they are not loaded from an image host. */}
+    <span className={cn("relative block bg-canvas-muted", (fit === "cover" || sizing === "frame") && "overflow-hidden", className)}>
+      {/* Data URLs are often complete before React can attach onLoad, so visibility must not depend on that event. */}
       {/* eslint-disable-next-line @next/next/no-img-element */}
       <img
         src={src ?? undefined}
         alt={alt}
-        className={cn("h-full w-full object-cover", loaded ? "opacity-100" : "opacity-0")}
-        onLoad={() => setLoaded(true)}
+        className={cn(
+          sizing === "frame" && "absolute inset-0 h-full w-full object-contain",
+          sizing === "intrinsic" && fit === "contain" && "block h-auto w-full object-contain",
+          sizing === "intrinsic" && fit === "cover" && "absolute inset-0 h-full w-full object-cover",
+        )}
         onError={() => setFailed(true)}
       />
     </span>

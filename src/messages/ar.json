@@ -8,7 +8,8 @@
     "cart": "السلة",
     "search": "بحث",
     "menu": "القائمة",
-    "logoAlt": "مفاتيح"
+    "logoAlt": "مفاتيح",
+    "comingSoon": "قريباً"
   },
   "Language": {
     "label": "اللغة",
@@ -19,7 +20,7 @@
     "switchTo": "تغيير اللغة إلى {language}"
   },
   "Menu": {
-    "title": "تصفح",
+    "title": "الأقسام",
     "home": "الرئيسية",
     "categories": "التصنيفات",
     "close": "إغلاق القائمة",
@@ -35,8 +36,10 @@
     "placeholder": "ابحث في الخدمات",
     "clear": "مسح البحث",
     "close": "إغلاق البحث",
-    "emptyTitle": "البحث جاهز",
-    "emptyBody": "ستظهر نتائج الخدمات هنا بعد ربط دليل الخدمات."
+    "hint": "اكتب حرفين على الأقل للبحث في الخدمات المنشورة.",
+    "loading": "جارٍ البحث…",
+    "none": "لا توجد خدمات منشورة مطابقة.",
+    "error": "البحث غير متاح حالياً."
   },
   "Account": {
     "title": "تسجيل الدخول",
@@ -54,7 +57,8 @@
     "emptyTitle": "سلتك فارغة",
     "emptyBody": "ستظهر هنا الخدمات التي تضيفها.",
     "continueShopping": "متابعة التسوق",
-    "countLabel": "{count, plural, zero {لا عناصر} one {عنصر واحد} two {عنصران} few {# عناصر} many {# عنصراً} other {# عنصر}}"
+    "countLabel": "{count, plural, zero {لا عناصر} one {عنصر واحد} two {عنصران} few {# عناصر} many {# عنصراً} other {# عنصر}}",
+    "remove": "إزالة"
   },
   "Footer": {
     "description": "تجمع مفاتيح بين التسويق والتقنية والأنظمة لتقديم خدمات رقمية.",
@@ -78,11 +82,52 @@
   "WhatsApp": {
     "label": "تواصل مع مفاتيح عبر واتساب"
   },
-  "Home": {
-    "eyebrow": "مفاتيح",
-    "title": "خدمات رقمية",
-    "message": "واجهة المتجر جاهزة. ستظهر هنا الخدمات المنشورة.",
-    "categoriesTitle": "فئات الخدمات"
+  "Store": {
+    "categoriesTitle": "اكتشف حلولنا",
+    "categoriesSubtitle": "اكتشف خدمات رقمية تساعد أعمالك على النمو والتواصل والعمل بكفاءة أكبر.",
+    "categoryPrevious": "التصنيفات السابقة",
+    "categoryNext": "التصنيفات التالية",
+    "categoryPage": "عرض صفحة التصنيفات {index}",
+    "emptyTitle": "يتم تجهيز الدليل",
+    "emptyBody": "ستظهر هنا التصنيفات والخدمات المنشورة.",
+    "home": "الرئيسية",
+    "breadcrumbs": "مسار التنقل",
+    "categoryEmpty": "لا توجد خدمات متاحة في هذا القسم حالياً.",
+    "description": "الوصف",
+    "reviews": "التقييمات",
+    "noReviews": "لا توجد تقييمات معتمدة بعد.",
+    "customer": "عميل",
+    "related": "خدمات ذات صلة",
+    "rating": "{rating} · {count} تقييمات",
+    "stars": "{count} من 5",
+    "heroLabel": "اللافتات المميزة",
+    "promoLabel": "العروض",
+    "previous": "اللافتة السابقة",
+    "next": "اللافتة التالية",
+    "slide": "عرض اللافتة {index}",
+    "brandMark": "MAFATEEH",
+    "sortLabel": "الترتيب",
+    "sortFeatured": "المميزة",
+    "sortNewest": "الأحدث",
+    "sortPriceAsc": "السعر: من الأقل إلى الأعلى",
+    "sortPriceDesc": "السعر: من الأعلى إلى الأقل",
+    "sortRating": "الأعلى تقييماً",
+    "results": "{title} — النتائج ({count})",
+    "addToCart": "أضف إلى السلة",
+    "featured": "مميز",
+    "pagePrevious": "الصفحة السابقة",
+    "pageNext": "الصفحة التالية",
+    "pageLabel": "صفحة"
+  },
+  "Testimonials": {
+    "title": "آراء عملائنا",
+    "empty": "ستظهر هنا تقييمات العملاء بعد اعتمادها.",
+    "preview": "معاينة — محتوى تجريبي",
+    "previous": "التقييمات السابقة",
+    "next": "التقييمات التالية",
+    "page": "عرض صفحة التقييمات {index}",
+    "stars": "{count} من 5 نجوم",
+    "read": "اقرأ التقييم"
   },
   "NotFound": {
     "title": "الصفحة غير موجودة",

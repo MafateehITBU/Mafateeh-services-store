@@ -1,6 +1,6 @@
 import "server-only";
 
-import { BannerPlacement, HomeSectionType, Locale, Prisma } from "@/generated/prisma/client";
+import { BannerPlacement, HomepageBlockType, HomeSectionType, Locale, Prisma } from "@/generated/prisma/client";
 import { prisma } from "@/lib/prisma";
 import { writeAdminAuditLog } from "@/server/admin/audit";
 import { ImageStorageError, imageFromDataUrl, optionalImageFromDataUrl } from "@/server/media/image-storage";
@@ -191,8 +191,55 @@ function presentSection(section: SectionRecord) {
   };
 }
 
+const singletonTypes = ["HERO_CAROUSEL", "CATEGORY_CAROUSEL", "TESTIMONIAL_CAROUSEL"] as const;
+type SingletonBlock = (typeof singletonTypes)[number];
+
+async function nextLayoutOrder(tx: Tx) {
+  const last = await tx.homepageLayoutItem.aggregate({ _max: { sortOrder: true } });
+  return (last._max.sortOrder ?? 0) + 1;
+}
+
+async function repairHomepageLayout() {
+  const [promos, sections, items] = await Promise.all([
+    prisma.storeBanner.findMany({
+      where: { placement: "HOME_PROMO" },
+      orderBy: [{ sortOrder: "asc" }, { createdAt: "asc" }],
+      select: { id: true },
+    }),
+    prisma.homeSection.findMany({ orderBy: [{ sortOrder: "asc" }, { createdAt: "asc" }], select: { id: true } }),
+    prisma.homepageLayoutItem.findMany({ select: { bannerId: true, sectionId: true } }),
+  ]);
+  const bannerIds = new Set(items.flatMap((item) => (item.bannerId ? [item.bannerId] : [])));
+  const sectionIds = new Set(items.flatMap((item) => (item.sectionId ? [item.sectionId] : [])));
+  const missingPromos = promos.filter((promo) => !bannerIds.has(promo.id));
+  const missingSections = sections.filter((section) => !sectionIds.has(section.id));
+
+  if (missingPromos.length === 0 && missingSections.length === 0) {
+    return;
+  }
+
+  await prisma.$transaction(async (tx) => {
+    let order = await nextLayoutOrder(tx);
+
+    for (const promo of missingPromos) {
+      await tx.homepageLayoutItem.create({
+        data: { type: HomepageBlockType.PROMOTIONAL_BANNER, bannerId: promo.id, sortOrder: order, isVisible: true },
+      });
+      order += 1;
+    }
+
+    for (const section of missingSections) {
+      await tx.homepageLayoutItem.create({
+        data: { type: HomepageBlockType.HOME_SECTION, sectionId: section.id, sortOrder: order, isVisible: true },
+      });
+      order += 1;
+    }
+  });
+}
+
 export async function getHomepageAdmin() {
-  const [banners, sections, categories, services] = await Promise.all([
+  await repairHomepageLayout();
+  const [banners, sections, categories, services, layout, approvedReviewCount] = await Promise.all([
     prisma.storeBanner.findMany({ orderBy: [{ placement: "asc" }, { sortOrder: "asc" }, { createdAt: "asc" }], select: bannerSelect }),
     prisma.homeSection.findMany({ orderBy: [{ sortOrder: "asc" }, { createdAt: "asc" }], select: sectionSelect }),
     prisma.category.findMany({
@@ -213,11 +260,20 @@ export async function getHomepageAdmin() {
         category: { select: { translations: { where: { locale: Locale.EN }, select: { title: true }, take: 1 } } },
       },
     }),
+    prisma.homepageLayoutItem.findMany({
+      orderBy: [{ sortOrder: "asc" }, { createdAt: "asc" }],
+      select: { id: true, type: true, bannerId: true, sectionId: true, isVisible: true, sortOrder: true },
+    }),
+    prisma.review.count({
+      where: { status: "APPROVED", service: { isActive: true, publishedAt: { not: null }, category: { isActive: true } } },
+    }),
   ]);
 
   return {
     banners: banners.map(presentBanner),
     sections: sections.map(presentSection),
+    layout,
+    approvedReviewCount,
     categories: categories.map((category) => ({ id: category.id, title: category.translations[0]?.title ?? "Category" })),
     services: services.map((service) => ({
       id: service.id,
@@ -270,7 +326,33 @@ async function writeBanner(tx: Tx, bannerId: string | undefined, input: BannerIn
 }
 
 export async function createBanner(actorId: string, input: BannerInput) {
-  const banner = await prisma.$transaction((tx) => writeBanner(tx, undefined, input));
+  const banner = await prisma.$transaction(async (tx) => {
+    if (input.placement === "HOME_HERO") {
+      const existing = await tx.storeBanner.count({ where: { placement: "HOME_HERO" } });
+
+      if (existing > 0) {
+        throw new HomepageRuleError(409, "hero_exists", "The homepage already has a hero banner.");
+      }
+    }
+
+    const saved = await writeBanner(tx, undefined, input);
+
+    if (saved.placement === "HOME_PROMO") {
+      await tx.homepageLayoutItem.create({
+        data: { type: HomepageBlockType.PROMOTIONAL_BANNER, bannerId: saved.id, sortOrder: await nextLayoutOrder(tx), isVisible: true },
+      });
+    } else {
+      const hero = await tx.homepageLayoutItem.findFirst({ where: { type: HomepageBlockType.HERO_CAROUSEL }, select: { id: true } });
+
+      if (!hero) {
+        await tx.homepageLayoutItem.create({
+          data: { type: HomepageBlockType.HERO_CAROUSEL, sortOrder: await nextLayoutOrder(tx), isVisible: true },
+        });
+      }
+    }
+
+    return saved;
+  });
   await writeAdminAuditLog({ actorId, action: "banner.create", entityType: "StoreBanner", entityId: banner.id, afterData: bannerSnapshot(banner) });
   return presentBanner(banner);
 }
@@ -404,7 +486,13 @@ async function writeSection(tx: Tx, sectionId: string | undefined, input: Sectio
 }
 
 export async function createSection(actorId: string, input: SectionInput) {
-  const section = await prisma.$transaction((tx) => writeSection(tx, undefined, input));
+  const section = await prisma.$transaction(async (tx) => {
+    const saved = await writeSection(tx, undefined, input);
+    await tx.homepageLayoutItem.create({
+      data: { type: HomepageBlockType.HOME_SECTION, sectionId: saved.id, sortOrder: await nextLayoutOrder(tx), isVisible: true },
+    });
+    return saved;
+  });
   await writeAdminAuditLog({ actorId, action: "section.create", entityType: "HomeSection", entityId: section.id, afterData: sectionSnapshot(section) });
   return presentSection(section);
 }
@@ -470,4 +558,90 @@ export async function reorderSections(actorId: string, ids: string[]) {
 
   await prisma.$transaction(ids.map((id, index) => prisma.homeSection.update({ where: { id }, data: { sortOrder: index + 1 } })));
   await writeAdminAuditLog({ actorId, action: "section.reorder", entityType: "HomeSection", entityId: ids[0], afterData: { ids } });
+}
+
+export async function reorderLayout(actorId: string, ids: string[]) {
+  const rows = await prisma.homepageLayoutItem.findMany({ select: { id: true } });
+  const known = new Set(rows.map((row) => row.id));
+
+  if (rows.length !== ids.length || new Set(ids).size !== ids.length || ids.some((id) => !known.has(id))) {
+    throw new HomepageRuleError(400, "invalid_order", "The homepage order does not match the saved blocks.");
+  }
+
+  await prisma.$transaction(ids.map((id, index) => prisma.homepageLayoutItem.update({ where: { id }, data: { sortOrder: index + 1 } })));
+  await writeAdminAuditLog({ actorId, action: "layout.reorder", entityType: "HomepageLayoutItem", entityId: ids[0], afterData: { ids } });
+}
+
+export async function setLayoutVisibility(actorId: string, id: string, isVisible: boolean) {
+  assertId(id);
+  const before = await prisma.homepageLayoutItem.findUnique({ where: { id }, select: { id: true, type: true, isVisible: true } });
+
+  if (!before) {
+    throw new HomepageRuleError(404, "not_found", "That homepage block was not found.");
+  }
+
+  const item = await prisma.homepageLayoutItem.update({ where: { id }, data: { isVisible }, select: { id: true, isVisible: true } });
+  await writeAdminAuditLog({
+    actorId,
+    action: isVisible ? "layout.show" : "layout.hide",
+    entityType: "HomepageLayoutItem",
+    entityId: id,
+    beforeData: before,
+    afterData: item,
+  });
+  return { isVisible: item.isVisible };
+}
+
+export async function createSingletonLayout(actorId: string, type: SingletonBlock) {
+  const existing = await prisma.homepageLayoutItem.findFirst({ where: { type }, select: { id: true } });
+
+  if (existing) {
+    throw new HomepageRuleError(409, "duplicate_block", "This block is already on the homepage.");
+  }
+
+  try {
+    const item = await prisma.$transaction(async (tx) =>
+      tx.homepageLayoutItem.create({
+        data: { type, sortOrder: await nextLayoutOrder(tx), isVisible: true },
+        select: { id: true, type: true, isVisible: true, sortOrder: true },
+      }),
+    );
+    await writeAdminAuditLog({ actorId, action: "layout.create", entityType: "HomepageLayoutItem", entityId: item.id, afterData: item });
+    return item;
+  } catch (error) {
+    if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2002") {
+      throw new HomepageRuleError(409, "duplicate_block", "This block is already on the homepage.");
+    }
+
+    throw error;
+  }
+}
+
+export async function deleteLayoutItem(actorId: string, id: string) {
+  assertId(id);
+  const item = await prisma.homepageLayoutItem.findUnique({
+    where: { id },
+    select: { id: true, type: true, bannerId: true, sectionId: true },
+  });
+
+  if (!item) {
+    throw new HomepageRuleError(404, "not_found", "That homepage block was not found.");
+  }
+
+  if (item.type === HomepageBlockType.PROMOTIONAL_BANNER && item.bannerId) {
+    await deleteBanner(actorId, item.bannerId);
+    return;
+  }
+
+  if (item.type === HomepageBlockType.HOME_SECTION && item.sectionId) {
+    await deleteSection(actorId, item.sectionId);
+    return;
+  }
+
+  if (!singletonTypes.includes(item.type as SingletonBlock)) {
+    throw new HomepageRuleError(400, "invalid_block", "That homepage block cannot be removed this way.");
+  }
+
+  await prisma.homepageLayoutItem.delete({ where: { id } });
+  await writeAdminAuditLog({ actorId, action: "layout.delete", entityType: "HomepageLayoutItem", entityId: id, beforeData: item });
 }

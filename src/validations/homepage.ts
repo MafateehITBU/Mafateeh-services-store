@@ -99,5 +99,13 @@ export const activeStatusSchema = z.object({
   isActive: z.boolean(),
 });
 
+export const layoutVisibilitySchema = z.object({
+  isVisible: z.boolean(),
+});
+
+export const layoutCreateSchema = z.object({
+  type: z.enum(["HERO_CAROUSEL", "CATEGORY_CAROUSEL", "TESTIMONIAL_CAROUSEL"]),
+});
+
 export type BannerInput = z.infer<typeof bannerInputSchema>;
 export type SectionInput = z.infer<typeof sectionInputSchema>;

@@ -3,7 +3,7 @@ import "server-only";
 import { Locale } from "@/generated/prisma/enums";
 import type { AppLocale } from "@/i18n/routing";
 import { prisma } from "@/lib/prisma";
-import type { PublicCategory, PublicCategoryResult } from "./types";
+import type { PublicCategory, PublicCategoryDetail, PublicCategoryResult } from "./types";
 
 const databaseLocale: Record<AppLocale, Locale> = {
   en: Locale.EN,
@@ -22,10 +22,9 @@ export async function getPublicCategoryTree(
         parentId: true,
         slug: true,
         iconName: true,
+        iconImageUrl: true,
         translations: {
-          where: { locale: databaseLocale[locale] },
-          select: { title: true },
-          take: 1,
+          select: { locale: true, title: true, description: true },
         },
       },
     });
@@ -33,41 +32,59 @@ export async function getPublicCategoryTree(
     const nodes = new Map<string, PublicCategory>();
 
     for (const row of rows) {
-      const title = row.translations[0]?.title;
+      const translation = row.translations.find((item) => item.locale === databaseLocale[locale]) ?? row.translations[0];
 
-      if (!title) {
+      if (!translation?.title) {
         continue;
       }
 
       nodes.set(row.id, {
         id: row.id,
         slug: row.slug,
-        title,
+        title: translation.title,
+        description: translation.description,
+        imageUrl: row.iconImageUrl,
         iconName: row.iconName,
         children: [],
       });
     }
 
-    const roots: PublicCategory[] = [];
-
-    for (const row of rows) {
+    const categories = rows.flatMap((row) => {
       const node = nodes.get(row.id);
+      return node ? [node] : [];
+    });
 
-      if (!node) {
-        continue;
-      }
-
-      const parent = row.parentId ? nodes.get(row.parentId) : undefined;
-
-      if (parent) {
-        parent.children.push(node);
-      } else if (!row.parentId) {
-        roots.push(node);
-      }
-    }
-
-    return { categories: roots, unavailable: false };
+    return { categories, unavailable: false };
   } catch {
     return { categories: [], unavailable: true };
   }
+}
+
+export async function getPublicCategory(slug: string, locale: AppLocale): Promise<PublicCategoryDetail | null> {
+  const row = await prisma.category.findFirst({
+    where: { slug, isActive: true },
+    select: {
+      id: true,
+      slug: true,
+      iconImageUrl: true,
+      bannerImageUrl: true,
+      translations: { select: { locale: true, title: true, description: true, seoTitle: true, seoDescription: true } },
+    },
+  });
+  const translation = row?.translations.find((item) => item.locale === databaseLocale[locale]) ?? row?.translations[0];
+
+  if (!row || !translation?.title) {
+    return null;
+  }
+
+  return {
+    id: row.id,
+    slug: row.slug,
+    title: translation.title,
+    description: translation.description,
+    imageUrl: row.iconImageUrl,
+    bannerImageUrl: row.bannerImageUrl,
+    seoTitle: translation.seoTitle,
+    seoDescription: translation.seoDescription,
+  };
 }

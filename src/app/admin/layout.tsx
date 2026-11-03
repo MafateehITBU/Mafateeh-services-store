@@ -1,3 +1,4 @@
+import { storefrontFonts } from "@/app/fonts";
 import type { Metadata } from "next";
 import type { ReactNode } from "react";
 import "../globals.css";
@@ -14,7 +15,7 @@ export const instant = false;
 
 export default function AdminRootLayout({ children }: { children: ReactNode }) {
   return (
-    <html lang="en" dir="ltr" className="h-full">
+    <html lang="en" dir="ltr" className={`${storefrontFonts} h-full`}>
       <body className="min-h-full bg-[#f3f5f4] text-ink antialiased">{children}</body>
     </html>
   );

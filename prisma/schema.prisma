@@ -49,6 +49,14 @@ enum HomeSectionType {
   CUSTOM_SERVICES
 }
 
+enum HomepageBlockType {
+  HERO_CAROUSEL
+  PROMOTIONAL_BANNER
+  CATEGORY_CAROUSEL
+  HOME_SECTION
+  TESTIMONIAL_CAROUSEL
+}
+
 enum OrderStatus {
   PENDING_PAYMENT
   PAID
@@ -283,6 +291,7 @@ model StoreBanner {
   updatedAt       DateTime        @updatedAt
 
   translations StoreBannerTranslation[]
+  layoutItem  HomepageLayoutItem?
 
   @@index([placement, isActive, sortOrder])
   @@index([startsAt, endsAt])
@@ -317,10 +326,30 @@ model HomeSection {
   category     Category?                @relation(fields: [categoryId], references: [id], onDelete: Restrict, onUpdate: Cascade)
   translations HomeSectionTranslation[]
   services     HomeSectionService[]
+  layoutItem   HomepageLayoutItem?
 
   @@index([isActive, sortOrder])
   @@index([type])
   @@index([categoryId])
+}
+
+/// Global homepage order. Promotional banners and home sections are repeatable.
+/// Hero, category, and testimonial carousels are singletons, enforced by a partial unique index.
+model HomepageLayoutItem {
+  id        String            @id @default(uuid()) @db.Uuid
+  type      HomepageBlockType
+  bannerId  String?           @unique @db.Uuid
+  sectionId String?           @unique @db.Uuid
+  isVisible Boolean           @default(true)
+  sortOrder Int
+  createdAt DateTime          @default(now())
+  updatedAt DateTime          @updatedAt
+
+  banner  StoreBanner? @relation(fields: [bannerId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+  section HomeSection? @relation(fields: [sectionId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+
+  @@index([sortOrder])
+  @@index([type])
 }
 
 model HomeSectionTranslation {

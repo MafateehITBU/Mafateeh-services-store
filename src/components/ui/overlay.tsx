@@ -1,7 +1,7 @@
 "use client";
 
 import { cn } from "@/lib/utils";
-import { useEffect, useId, useRef } from "react";
+import { useEffect, useId, useRef, useState } from "react";
 
 const focusableSelector = [
   "a[href]",
@@ -19,6 +19,7 @@ type OverlayProps = {
   children: React.ReactNode;
   panelClassName?: string;
   align?: "left" | "right" | "center" | "top";
+  closeLabel?: string;
 };
 
 export function Overlay({
@@ -28,28 +29,58 @@ export function Overlay({
   children,
   panelClassName,
   align = "center",
+  closeLabel = "Close",
 }: OverlayProps) {
   const panelRef = useRef<HTMLDivElement>(null);
+  const onCloseRef = useRef(onClose);
   const titleDomId = useId();
   const labelledBy = titleId || titleDomId;
+  const [rendered, setRendered] = useState(open);
+  const [visible, setVisible] = useState(false);
 
   useEffect(() => {
-    if (!open) {
+    onCloseRef.current = onClose;
+  }, [onClose]);
+
+  useEffect(() => {
+    if (open) {
+      const show = window.setTimeout(() => setRendered(true), 0);
+      return () => window.clearTimeout(show);
+    }
+
+    const hide = window.setTimeout(() => setVisible(false), 0);
+    const reduced = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    const timer = window.setTimeout(() => setRendered(false), reduced ? 0 : 350);
+    return () => {
+      window.clearTimeout(hide);
+      window.clearTimeout(timer);
+    };
+  }, [open]);
+
+  useEffect(() => {
+    if (!rendered || !open) {
+      return;
+    }
+
+    const frame = window.requestAnimationFrame(() => setVisible(true));
+    return () => window.cancelAnimationFrame(frame);
+  }, [rendered, open]);
+
+  useEffect(() => {
+    if (!open || !rendered) {
       return;
     }
 
     const previouslyFocused = document.activeElement as HTMLElement | null;
     const originalOverflow = document.body.style.overflow;
     document.body.style.overflow = "hidden";
-
     const panel = panelRef.current;
-    const focusable = panel?.querySelectorAll<HTMLElement>(focusableSelector);
-    focusable?.[0]?.focus();
+    panel?.querySelector<HTMLElement>(focusableSelector)?.focus();
 
     function onKeyDown(event: KeyboardEvent) {
       if (event.key === "Escape") {
         event.preventDefault();
-        onClose();
+        onCloseRef.current();
         return;
       }
 
@@ -84,15 +115,23 @@ export function Overlay({
       document.removeEventListener("keydown", onKeyDown);
       previouslyFocused?.focus();
     };
-  }, [open, onClose]);
+  }, [open, rendered]);
 
-  if (!open) {
+  if (!rendered) {
     return null;
   }
 
   return (
     <div className="fixed inset-0 z-[70]">
-      <button type="button" aria-label="Close" className="absolute inset-0 cursor-pointer bg-brand-deep/45" onClick={onClose} />
+      <button
+        type="button"
+        aria-label={closeLabel}
+        className={cn(
+          "absolute inset-0 cursor-pointer bg-brand-deep/55 backdrop-blur-md transition-opacity duration-300 ease-out motion-reduce:transition-none",
+          visible ? "opacity-100" : "opacity-0",
+        )}
+        onClick={() => onCloseRef.current()}
+      />
       <div
         className={cn(
           "pointer-events-none absolute",
@@ -108,12 +147,16 @@ export function Overlay({
           aria-modal="true"
           aria-labelledby={labelledBy}
           className={cn(
-            "pointer-events-auto relative max-h-full bg-white text-ink shadow-[var(--shadow-panel)]",
+            "pointer-events-auto relative max-h-full bg-white text-ink shadow-[var(--shadow-panel)] transition-transform duration-300 ease-[cubic-bezier(0.22,1,0.36,1)] motion-reduce:transition-none",
             align === "center" && "w-full max-w-md rounded-3xl",
             align === "top" && "w-full max-w-2xl rounded-3xl",
-            align !== "center" && "h-full w-[min(100%,22rem)]",
+            align === "right" && (visible ? "translate-x-0" : "translate-x-full"),
+            align === "left" && (visible ? "translate-x-0" : "-translate-x-full"),
+            (align === "center" || align === "top") && (visible ? "translate-y-0 opacity-100" : "translate-y-4 opacity-0"),
+            align !== "center" && align !== "top" && "h-full w-[min(90vw,30rem)]",
             panelClassName,
           )}
+          onClick={(event) => event.stopPropagation()}
         >
           {children}
         </div>

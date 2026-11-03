@@ -1,16 +1,12 @@
 import "server-only";
 
 import { emptyDocument, sanitizeRichText } from "@/features/services/rich-text";
-import { Locale, Prisma } from "@/generated/prisma/client";
+import { Locale } from "@/generated/prisma/client";
 import { prisma } from "@/lib/prisma";
 
 const localeMap = { en: Locale.EN, ar: Locale.AR } as const;
 
 type PublicLocale = keyof typeof localeMap;
-
-function money(value: Prisma.Decimal | null) {
-  return value ? value.toString() : null;
-}
 
 async function approvedRatings(serviceIds: string[]) {
   const ratings = new Map<string, { ratingAverage: number | null; reviewCount: number }>();
@@ -42,28 +38,27 @@ const publishedWhere = {
   category: { isActive: true },
 } as const;
 
-export async function listPublicServices(locale: PublicLocale) {
+export async function listPublicServices(locale: PublicLocale, categorySlug?: string) {
   const language = localeMap[locale];
   const rows = await prisma.service.findMany({
-    where: { ...publishedWhere, translations: { some: { locale: language } } },
+    where: categorySlug ? { ...publishedWhere, category: { slug: categorySlug, isActive: true } } : publishedWhere,
     orderBy: [{ sortOrder: "asc" }, { publishedAt: "desc" }],
     select: {
       id: true,
       slug: true,
       coverImageUrl: true,
       basePrice: true,
-      compareAtPrice: true,
       currency: true,
       isFeatured: true,
-      translations: { where: { locale: language }, select: { name: true, shortDescription: true }, take: 1 },
-      category: { select: { slug: true, translations: { where: { locale: language }, select: { title: true }, take: 1 } } },
+      translations: { select: { locale: true, name: true, shortDescription: true } },
+      category: { select: { slug: true, translations: { select: { locale: true, title: true } } } },
     },
   });
   const ratings = await approvedRatings(rows.map((row) => row.id));
 
   return rows.flatMap((row) => {
-    const translation = row.translations[0];
-    const category = row.category.translations[0];
+    const translation = row.translations.find((item) => item.locale === language) ?? row.translations[0];
+    const category = row.category.translations.find((item) => item.locale === language) ?? row.category.translations[0];
 
     if (!translation || !category || !row.coverImageUrl) {
       return [];
@@ -76,8 +71,7 @@ export async function listPublicServices(locale: PublicLocale) {
         name: translation.name,
         shortDescription: translation.shortDescription,
         coverImageUrl: row.coverImageUrl,
-        basePrice: row.basePrice.toString(),
-        compareAtPrice: money(row.compareAtPrice),
+        price: row.basePrice.toString(),
         currency: row.currency,
         isFeatured: row.isFeatured,
         category: { slug: row.category.slug, title: category.title },
@@ -88,50 +82,270 @@ export async function listPublicServices(locale: PublicLocale) {
   });
 }
 
-export async function getPublicService(slug: string, locale: PublicLocale) {
+export async function listPublicServicesByCategory(locale: PublicLocale, categorySlug: string) {
+  return listPublicServices(locale, categorySlug);
+}
+
+export const categoryPageSize = 12;
+
+export const categorySortValues = ["featured", "newest", "price-asc", "price-desc", "rating"] as const;
+
+export type CategorySort = (typeof categorySortValues)[number];
+
+export type CategoryListingService = {
+  id: string;
+  slug: string;
+  name: string;
+  shortDescription: string;
+  coverImageUrl: string;
+  price: string;
+  currency: string;
+  isFeatured: boolean;
+  categoryTitle: string;
+  ratingAverage: number | null;
+  reviewCount: number;
+};
+
+export type CategoryListing = {
+  services: CategoryListingService[];
+  total: number;
+  page: number;
+  pageSize: number;
+  pageCount: number;
+  sort: CategorySort;
+};
+
+export function parseCategorySort(value: string | undefined): CategorySort {
+  return categorySortValues.includes(value as CategorySort) ? (value as CategorySort) : "featured";
+}
+
+export function parseCategoryPage(value: string | undefined): number {
+  const page = Number(value);
+  return Number.isInteger(page) && page > 0 ? page : 1;
+}
+
+const listingSelect = {
+  id: true,
+  slug: true,
+  coverImageUrl: true,
+  basePrice: true,
+  currency: true,
+  isFeatured: true,
+  translations: { select: { locale: true, name: true, shortDescription: true } },
+  category: { select: { translations: { select: { locale: true, title: true } } } },
+} as const;
+
+export async function listCategoryServices(locale: PublicLocale, categorySlug: string, sort: CategorySort, requestedPage: number): Promise<CategoryListing> {
+  const where = {
+    isActive: true,
+    publishedAt: { not: null },
+    coverImageUrl: { not: null },
+    category: { slug: categorySlug, isActive: true },
+  };
+  const total = await prisma.service.count({ where });
+  const pageCount = Math.max(1, Math.ceil(total / categoryPageSize));
+  const page = Math.min(requestedPage, total === 0 ? 1 : pageCount);
+  const skip = (page - 1) * categoryPageSize;
   const language = localeMap[locale];
-  const service = await prisma.service.findFirst({
-    where: { slug, ...publishedWhere, translations: { some: { locale: language } } },
+  const rows = sort === "rating"
+    ? await rankedCategoryServices(categorySlug, skip)
+    : await prisma.service.findMany({
+        where,
+        orderBy: categoryOrder(sort),
+        skip,
+        take: categoryPageSize,
+        select: listingSelect,
+      });
+  const ratings = await approvedRatings(rows.map((row) => row.id));
+
+  return {
+    services: rows.flatMap((row) => {
+      const translation = row.translations.find((item) => item.locale === language) ?? row.translations[0];
+      const category = row.category.translations.find((item) => item.locale === language) ?? row.category.translations[0];
+
+      if (!translation || !category || !row.coverImageUrl) {
+        return [];
+      }
+
+      return [{
+        id: row.id,
+        slug: row.slug,
+        name: translation.name,
+        shortDescription: translation.shortDescription,
+        coverImageUrl: row.coverImageUrl,
+        price: formatAmount(row.basePrice.toString(), locale),
+        currency: row.currency,
+        isFeatured: row.isFeatured,
+        categoryTitle: category.title,
+        ratingAverage: ratings.get(row.id)?.ratingAverage ?? null,
+        reviewCount: ratings.get(row.id)?.reviewCount ?? 0,
+      }];
+    }),
+    total,
+    page,
+    pageSize: categoryPageSize,
+    pageCount: total === 0 ? 0 : pageCount,
+    sort,
+  };
+}
+
+function categoryOrder(sort: Exclude<CategorySort, "rating">) {
+  if (sort === "newest") {
+    return [{ publishedAt: "desc" as const }, { sortOrder: "asc" as const }];
+  }
+
+  if (sort === "price-asc") {
+    return [{ basePrice: "asc" as const }, { publishedAt: "desc" as const }];
+  }
+
+  if (sort === "price-desc") {
+    return [{ basePrice: "desc" as const }, { publishedAt: "desc" as const }];
+  }
+
+  return [{ isFeatured: "desc" as const }, { sortOrder: "asc" as const }, { publishedAt: "desc" as const }];
+}
+
+async function rankedCategoryServices(categorySlug: string, skip: number) {
+  const ranked = await prisma.$queryRaw<Array<{ id: string }>>`
+    SELECT s.id
+    FROM "Service" s
+    INNER JOIN "Category" c ON c.id = s."categoryId"
+    LEFT JOIN (
+      SELECT "serviceId", AVG(rating) AS average, COUNT(*)::int AS reviews
+      FROM "Review"
+      WHERE status = 'APPROVED'::"ReviewStatus"
+      GROUP BY "serviceId"
+    ) r ON r."serviceId" = s.id
+    WHERE c.slug = ${categorySlug}
+      AND c."isActive" = true
+      AND s."isActive" = true
+      AND s."publishedAt" IS NOT NULL
+      AND s."coverImageUrl" IS NOT NULL
+    ORDER BY r.average DESC NULLS LAST, r.reviews DESC NULLS LAST, s."publishedAt" DESC
+    LIMIT ${categoryPageSize} OFFSET ${skip}
+  `;
+  const ids = ranked.map((row) => row.id);
+
+  if (ids.length === 0) {
+    return [];
+  }
+
+  const rows = await prisma.service.findMany({ where: { id: { in: ids } }, select: listingSelect });
+  const byId = new Map(rows.map((row) => [row.id, row]));
+  return ids.flatMap((id) => {
+    const row = byId.get(id);
+    return row ? [row] : [];
+  });
+}
+
+function formatAmount(value: string, locale: PublicLocale) {
+  const amount = Number(value);
+
+  if (!Number.isFinite(amount)) {
+    return value;
+  }
+
+  return new Intl.NumberFormat(locale === "ar" ? "ar" : "en", {
+    minimumFractionDigits: Number.isInteger(amount) ? 0 : 3,
+    maximumFractionDigits: 3,
+  }).format(amount);
+}
+
+export async function searchPublicServices(locale: PublicLocale, query: string) {
+  const term = query.trim();
+
+  if (term.length < 2 || term.length > 80) {
+    return [];
+  }
+
+  const language = localeMap[locale];
+  const rows = await prisma.service.findMany({
+    where: {
+      ...publishedWhere,
+      translations: { some: { name: { contains: term, mode: "insensitive" } } },
+    },
+    orderBy: [{ sortOrder: "asc" }, { publishedAt: "desc" }],
+    take: 8,
     select: {
-      id: true,
       slug: true,
       coverImageUrl: true,
       basePrice: true,
-      compareAtPrice: true,
       currency: true,
-      isFeatured: true,
-      translations: { where: { locale: language }, take: 1 },
-      images: { orderBy: { sortOrder: "asc" }, select: { imageUrl: true, altText: true, sortOrder: true } },
-      variants: {
-        where: { isActive: true },
-        orderBy: { sortOrder: "asc" },
-        select: {
-          id: true,
-          price: true,
-          compareAtPrice: true,
-          currency: true,
-          sortOrder: true,
-          translations: { select: { locale: true, name: true, description: true } },
-        },
-      },
-      reviews: {
-        where: { status: "APPROVED" },
-        orderBy: { createdAt: "desc" },
-        take: 20,
-        select: { id: true, rating: true, comment: true, createdAt: true },
-      },
-      category: { select: { slug: true, translations: { where: { locale: language }, select: { title: true }, take: 1 } } },
+      translations: { select: { locale: true, name: true } },
     },
   });
 
-  const translation = service?.translations[0];
-  const category = service?.category.translations[0];
+  return rows.flatMap((row) => {
+    const translation = row.translations.find((item) => item.locale === language) ?? row.translations[0];
+
+    if (!translation || !row.coverImageUrl) {
+      return [];
+    }
+
+    return [
+      {
+        slug: row.slug,
+        name: translation.name,
+        coverImageUrl: row.coverImageUrl,
+        price: row.basePrice.toString(),
+        currency: row.currency,
+      },
+    ];
+  });
+}
+
+export async function getPublicService(slug: string, locale: PublicLocale) {
+  const language = localeMap[locale];
+  const service = await prisma.service.findFirst({
+    where: { slug, ...publishedWhere },
+    select: {
+      id: true,
+      slug: true,
+      categoryId: true,
+      coverImageUrl: true,
+      basePrice: true,
+      currency: true,
+      translations: true,
+      images: { orderBy: { sortOrder: "asc" }, select: { id: true, imageUrl: true, altText: true } },
+      reviews: {
+        where: { status: "APPROVED" },
+        orderBy: { createdAt: "desc" },
+        take: 12,
+        select: {
+          id: true,
+          rating: true,
+          comment: true,
+          createdAt: true,
+          user: { select: { firstName: true, lastName: true } },
+        },
+      },
+      category: { select: { slug: true, translations: { select: { locale: true, title: true } } } },
+    },
+  });
+  const translation = service?.translations.find((item) => item.locale === language) ?? service?.translations[0];
+  const category = service?.category.translations.find((item) => item.locale === language) ?? service?.category.translations[0];
 
   if (!service || !translation || !category || !service.coverImageUrl) {
     return null;
   }
 
-  const ratings = await approvedRatings([service.id]);
+  const [ratings, relatedRows] = await Promise.all([
+    approvedRatings([service.id]),
+    prisma.service.findMany({
+      where: { ...publishedWhere, categoryId: service.categoryId, id: { not: service.id } },
+      orderBy: [{ sortOrder: "asc" }, { publishedAt: "desc" }],
+      take: 4,
+      select: {
+        id: true,
+        slug: true,
+        coverImageUrl: true,
+        basePrice: true,
+        currency: true,
+        translations: { select: { locale: true, name: true, shortDescription: true } },
+      },
+    }),
+  ]);
+  const relatedRatings = await approvedRatings(relatedRows.map((row) => row.id));
 
   return {
     id: service.id,
@@ -139,41 +353,42 @@ export async function getPublicService(slug: string, locale: PublicLocale) {
     name: translation.name,
     shortDescription: translation.shortDescription,
     detailedDescription: sanitizeRichText(translation.detailedDescription ?? emptyDocument),
+    seoTitle: translation.seoTitle,
+    seoDescription: translation.seoDescription,
     coverImageUrl: service.coverImageUrl,
     gallery: service.images,
-    basePrice: service.basePrice.toString(),
-    compareAtPrice: money(service.compareAtPrice),
+    price: service.basePrice.toString(),
     currency: service.currency,
-    isFeatured: service.isFeatured,
     category: { slug: service.category.slug, title: category.title },
     ratingAverage: ratings.get(service.id)?.ratingAverage ?? null,
     reviewCount: ratings.get(service.id)?.reviewCount ?? 0,
-    packages: service.variants.flatMap((item) => {
-      const english = item.translations.find((copy) => copy.locale === Locale.EN);
-      const arabic = item.translations.find((copy) => copy.locale === Locale.AR);
-      const copy = item.translations.find((entry) => entry.locale === language);
-
-      if (!english?.name || !arabic?.name || !copy) {
-        return [];
-      }
-
-      return [
-        {
-          id: item.id,
-          name: copy.name,
-          description: copy.description,
-          price: item.price.toString(),
-          compareAtPrice: money(item.compareAtPrice),
-          currency: item.currency,
-          sortOrder: item.sortOrder,
-        },
-      ];
-    }),
     reviews: service.reviews.map((review) => ({
       id: review.id,
       rating: review.rating,
       comment: review.comment,
       createdAt: review.createdAt.toISOString(),
+      author: [review.user.firstName, review.user.lastName].filter(Boolean).join(" "),
     })),
+    related: relatedRows.flatMap((row) => {
+      const copy = row.translations.find((item) => item.locale === language) ?? row.translations[0];
+
+      if (!copy || !row.coverImageUrl) {
+        return [];
+      }
+
+      return [
+        {
+          id: row.id,
+          slug: row.slug,
+          name: copy.name,
+          shortDescription: copy.shortDescription,
+          coverImageUrl: row.coverImageUrl,
+          price: row.basePrice.toString(),
+          currency: row.currency,
+          ratingAverage: relatedRatings.get(row.id)?.ratingAverage ?? null,
+          reviewCount: relatedRatings.get(row.id)?.reviewCount ?? 0,
+        },
+      ];
+    }),
   };
 }

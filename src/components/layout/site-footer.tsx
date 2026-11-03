@@ -14,11 +14,11 @@ export async function SiteFooter({ locale }: { locale: AppLocale }) {
     <footer className="mt-16 bg-brand-deep text-white">
       <Container className="grid gap-10 py-12 md:grid-cols-2 xl:grid-cols-4">
         <div>
-          <BrandLogo alt={logoAlt("logoAlt")} variant="white" />
+          <BrandLogo alt={logoAlt("logoAlt")} variant="white" className="h-10 md:h-12" />
           <p className="mt-4 max-w-xs text-sm leading-7 text-white/80">{t("description")}</p>
         </div>
         <FooterColumn title={t("store")}>
-          <Link href="/" className="hover:text-brand-gold">
+          <Link href="/" className="cursor-pointer hover:text-brand-gold">
             {t("home")}
           </Link>
         </FooterColumn>
@@ -46,18 +46,12 @@ export async function SiteFooter({ locale }: { locale: AppLocale }) {
       <div className="border-t border-white/15">
         <Container className="flex flex-col gap-4 py-5 text-sm text-white/75 md:flex-row md:items-center md:justify-between">
           <p>{t("rights", { year: site.copyrightYear })}</p>
-          <div className="flex flex-wrap gap-4">
-            {site.privacyHref ? (
-              <ExternalLink href={site.privacyHref}>{t("privacy")}</ExternalLink>
-            ) : (
-              <span>{t("privacy")}</span>
-            )}
-            {site.termsHref ? (
-              <ExternalLink href={site.termsHref}>{t("terms")}</ExternalLink>
-            ) : (
-              <span>{t("terms")}</span>
-            )}
-          </div>
+          {site.privacyHref || site.termsHref ? (
+            <div className="flex flex-wrap gap-4">
+              {site.privacyHref ? <ExternalLink href={site.privacyHref}>{t("privacy")}</ExternalLink> : null}
+              {site.termsHref ? <ExternalLink href={site.termsHref}>{t("terms")}</ExternalLink> : null}
+            </div>
+          ) : null}
         </Container>
         <Container className="pb-8">
           <div className="rounded-2xl border border-dashed border-white/25 px-4 py-4">
@@ -87,7 +81,7 @@ function FooterColumn({
 
 function ExternalLink({ href, children }: { href: string; children: React.ReactNode }) {
   return (
-    <a href={href} target="_blank" rel="noopener noreferrer" className="hover:text-brand-gold">
+    <a href={href} target="_blank" rel="noopener noreferrer" className="cursor-pointer hover:text-brand-gold">
       {children}
     </a>
   );
@@ -110,7 +104,7 @@ function ContactLine({
     <p>
       <span className="block text-xs text-white/55">{label}</span>
       {href ? (
-        <a href={href} className="hover:text-brand-gold">
+        <a href={href} className="cursor-pointer hover:text-brand-gold">
           {value}
         </a>
       ) : (

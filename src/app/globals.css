@@ -30,8 +30,9 @@
   --space-8: 2rem;
   --space-12: 3rem;
   --space-16: 4rem;
+  --header-height: 4.5rem;
   --header-gradient: linear-gradient(105deg, #0e5a2c 0%, #157037 46%, #2f9a58 100%);
-  --font-sans: "Segoe UI", Tahoma, "Noto Naskh Arabic", "Geeza Pro", Arial, sans-serif;
+  --font-sans: var(--font-manrope), var(--font-arabic), "Segoe UI", Tahoma, Arial, sans-serif;
 }
 
 @theme inline {
@@ -71,8 +72,24 @@ body {
   font-family: var(--font-sans);
 }
 
+@media (min-width: 768px) {
+  :root {
+    --header-height: 5.5rem;
+  }
+}
+
 [dir="rtl"] {
   letter-spacing: 0;
+}
+
+@keyframes mafateeh-fade {
+  from {
+    opacity: 0;
+  }
+
+  to {
+    opacity: 1;
+  }
 }
 
 :focus-visible {

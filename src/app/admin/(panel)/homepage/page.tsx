@@ -9,7 +9,7 @@ export default function AdminHomepagePage() {
     <>
       <AdminPageHeader
         title="Homepage"
-        description="Arrange the hero carousel, promotional banners, and the category and service sections shown on the public homepage."
+        description="Arrange every homepage block, then edit its content from one page. The public homepage uses this order."
       />
       <HomepageManager />
     </>

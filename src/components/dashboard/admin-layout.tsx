@@ -54,7 +54,7 @@ export function AdminLayout({ user, children }: { user: AdminPrincipal; children
           onToggleCollapse={() => setCollapsed((value) => !value)}
           onLogout={() => setConfirmLogout(true)}
         />
-        <main className="mx-auto w-full max-w-6xl px-4 py-6 md:px-8">{children}</main>
+        <main className="mx-auto w-full max-w-6xl px-4 py-6 md:px-8 has-[.homepage-builder]:max-w-none has-[.homepage-builder]:px-4 has-[.homepage-builder]:py-4 md:has-[.homepage-builder]:px-5">{children}</main>
       </div>
       <ConfirmDialog
         open={confirmLogout}
