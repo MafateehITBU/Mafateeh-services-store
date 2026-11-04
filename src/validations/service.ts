@@ -66,6 +66,7 @@ export const serviceInputSchema = z
     basePrice: money,
     compareAtPrice: optionalMoney,
     currency: currencySchema,
+    loyaltyPoints: z.coerce.number().int().min(0).max(1_000_000).default(0),
     isFeatured: z.boolean(),
     sortOrder: z.coerce.number().int().min(1).max(100000),
     intent: z.enum(["draft", "publish", "keep"]),

@@ -4,16 +4,10 @@ const localized = {
   en: {
     address: "Wahib Al Afyouni St., Amman, Jordan",
     hours: "9:00 AM – 5:00 PM",
-    about: "https://www.mafateehgroup.com/en/about",
-    services: "https://www.mafateehgroup.com/en/",
-    contact: "https://www.mafateehgroup.com/en/contact",
   },
   ar: {
     address: "شارع وهيب الأفيوني، عمّان، الأردن",
     hours: "9:00 صباحاً – 5:00 مساءً",
-    about: "https://www.mafateehgroup.com/ar/about",
-    services: "https://www.mafateehgroup.com/ar/",
-    contact: "https://www.mafateehgroup.com/ar/contact",
   },
 } as const;
 
@@ -25,8 +19,6 @@ export const site = {
   email: "info@mafateehgroup.com",
   emailHref: "mailto:info@mafateehgroup.com",
   copyrightYear: 2026,
-  privacyHref: null as string | null,
-  termsHref: null as string | null,
   social: [] as Array<{ href: string; label: string }>,
   locale(locale: AppLocale) {
     return localized[locale];

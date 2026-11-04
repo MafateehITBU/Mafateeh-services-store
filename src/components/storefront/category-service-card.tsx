@@ -1,4 +1,5 @@
 import { AddToCartButton } from "@/components/storefront/add-to-cart-button";
+import { WishlistButton } from "@/components/storefront/wishlist-button";
 import { StoredImage } from "@/components/ui/stored-image";
 import { Link } from "@/i18n/navigation";
 import { Star } from "lucide-react";
@@ -29,7 +30,8 @@ export function CategoryServiceCard({
   const rated = service.reviewCount > 0 && service.ratingAverage != null;
 
   return (
-    <article className="flex h-full flex-col overflow-hidden rounded-2xl border border-[#e4ebe6] bg-white shadow-[0_10px_18px_-14px_rgba(12,61,30,0.45)] transition duration-300 hover:-translate-y-1 hover:shadow-[0_16px_24px_-14px_rgba(12,61,30,0.4)]">
+    <article className="relative flex h-full flex-col overflow-hidden rounded-2xl border border-[#e4ebe6] bg-white shadow-[0_10px_18px_-14px_rgba(12,61,30,0.45)] transition duration-300 hover:-translate-y-1 hover:shadow-[0_16px_24px_-14px_rgba(12,61,30,0.4)]">
+      <WishlistButton serviceId={service.id} />
       <Link href={`/services/${service.slug}`} className="flex flex-1 cursor-pointer flex-col">
         <StoredImage src={service.coverImageUrl} alt={service.name} className="aspect-square w-full" />
         <div className="flex flex-1 flex-col px-3 pt-3 text-center">

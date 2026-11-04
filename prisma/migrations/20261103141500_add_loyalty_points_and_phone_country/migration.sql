@@ -1,0 +1,3 @@
+ALTER TABLE "User" ADD COLUMN "phoneCountry" VARCHAR(2);
+
+ALTER TABLE "Service" ADD COLUMN "loyaltyPoints" INTEGER NOT NULL DEFAULT 0;

@@ -13,7 +13,7 @@ export async function readStorefrontCustomer() {
 
     const user = await prisma.user.findUnique({
       where: { id: userId },
-      select: { id: true, role: true, status: true, firstName: true, profileCompletedAt: true },
+      select: { id: true, role: true, status: true, firstName: true, profileCompletedAt: true, avatarUrl: true },
     });
 
     if (!user || user.role !== "CUSTOMER" || user.status !== "ACTIVE") {
@@ -25,6 +25,7 @@ export async function readStorefrontCustomer() {
     return {
       id: user.id,
       firstName,
+      avatarUrl: user.avatarUrl?.startsWith("data:image/") ? user.avatarUrl : null,
       needsProfile: !user.profileCompletedAt || firstName.length === 0,
     };
   } catch {

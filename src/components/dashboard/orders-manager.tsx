@@ -4,7 +4,6 @@ import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { DataTable } from "@/components/dashboard/data-table";
-import { EmptyState } from "@/components/dashboard/empty-state";
 import { LoadingState } from "@/components/dashboard/loading-state";
 import { StatusBadge, statusLabel, statusTone } from "@/components/dashboard/status-badge";
 
@@ -99,45 +98,42 @@ export function OrdersManager() {
       </form>
       {error ? <p className="rounded-xl bg-danger/10 px-4 py-3 text-sm text-danger">{error}</p> : null}
       {loading ? <LoadingState /> : null}
-      {!loading && data && data.orders.length === 0 ? (
-        <EmptyState title="No orders" body="Orders will appear here after customers check out." />
-      ) : null}
-      {!loading && data && data.orders.length > 0 ? (
-        <DataTable
-          tableClassName="min-w-[64rem]"
-          columns={[
-            {
-              key: "number",
-              header: "Order",
-              cell: (row) => <Link href={`/admin/orders/${row.id}`} className="cursor-pointer font-semibold text-brand">{row.orderNumber}</Link>,
-            },
-            { key: "customer", header: "Customer", cell: (row) => row.customer },
-            {
-              key: "status",
-              header: "Order",
-              cell: (row) => <StatusBadge tone={statusTone(row.status)}>{statusLabel(row.status)}</StatusBadge>,
-            },
-            {
-              key: "payment",
-              header: "Payment",
-              cell: (row) => <StatusBadge tone={statusTone(row.paymentStatus)}>{statusLabel(row.paymentStatus)}</StatusBadge>,
-            },
-            { key: "total", header: "Total", cell: (row) => row.total },
-            { key: "date", header: "Date", cell: (row) => row.createdAt.slice(0, 10) },
-          ]}
-          rows={data.orders}
-          emptyTitle="No orders"
-          emptyBody="Orders will appear here after customers check out."
-        />
-      ) : null}
-      {data && data.pageCount > 1 ? (
-        <div className="flex items-center justify-between">
-          <p className="text-sm text-muted">{data.total} orders · page {data.page} of {data.pageCount}</p>
-          <div className="flex gap-2">
-            <Button variant="secondary" disabled={page <= 1} onClick={() => setPage((value) => value - 1)}>Previous</Button>
-            <Button variant="secondary" disabled={page >= data.pageCount} onClick={() => setPage((value) => value + 1)}>Next</Button>
+      {!loading && data ? (
+        <article className="rounded-2xl border border-line bg-white p-4 shadow-[var(--shadow-soft)]">
+          <DataTable
+            tableClassName="min-w-[64rem]"
+            columns={[
+              {
+                key: "number",
+                header: "Order",
+                cell: (row) => <Link href={`/admin/orders/${row.id}`} className="cursor-pointer font-semibold text-brand">{row.orderNumber}</Link>,
+              },
+              { key: "customer", header: "Customer", cell: (row) => row.customer },
+              {
+                key: "status",
+                header: "Order",
+                cell: (row) => <StatusBadge tone={statusTone(row.status)}>{statusLabel(row.status)}</StatusBadge>,
+              },
+              {
+                key: "payment",
+                header: "Payment",
+                cell: (row) => <StatusBadge tone={statusTone(row.paymentStatus)}>{statusLabel(row.paymentStatus)}</StatusBadge>,
+              },
+              { key: "total", header: "Total", cell: (row) => row.total },
+              { key: "date", header: "Date", cell: (row) => row.createdAt.slice(0, 10) },
+            ]}
+            rows={data.orders}
+            emptyTitle="No orders"
+            emptyBody="Orders will appear here after customers check out."
+          />
+          <div className="mt-4 flex items-center justify-between gap-3">
+            <p className="text-sm text-muted">{data.total} orders · page {data.page} of {data.pageCount}</p>
+            <div className="flex gap-2">
+              <Button variant="secondary" disabled={page <= 1} onClick={() => setPage((value) => value - 1)}>Previous</Button>
+              <Button variant="secondary" disabled={page >= data.pageCount} onClick={() => setPage((value) => value + 1)}>Next</Button>
+            </div>
           </div>
-        </div>
+        </article>
       ) : null}
     </div>
   );

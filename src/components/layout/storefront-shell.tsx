@@ -2,6 +2,7 @@ import { SiteFooter } from "@/components/layout/site-footer";
 import { SiteHeader } from "@/components/layout/site-header";
 import { WhatsAppButton } from "@/components/layout/whatsapp-button";
 import { CartProvider } from "@/features/cart/cart-provider";
+import { WishlistProvider } from "@/features/wishlist/wishlist-provider";
 import { getPublicCategoryTree } from "@/features/categories/get-public-categories";
 import type { AppLocale } from "@/i18n/routing";
 import { readStorefrontCustomer } from "@/server/auth/storefront-user";
@@ -16,14 +17,16 @@ export async function StorefrontShell({ locale, children }: StorefrontShellProps
 
   return (
     <CartProvider>
-      <SiteHeader
-        categories={catalog.categories}
-        unavailable={catalog.unavailable}
-        customer={customer ? { firstName: customer.firstName, needsProfile: customer.needsProfile } : null}
-      />
-      <main className="flex-1">{children}</main>
-      <SiteFooter locale={locale} />
-      <WhatsAppButton />
+      <WishlistProvider>
+        <SiteHeader
+          categories={catalog.categories}
+          unavailable={catalog.unavailable}
+          customer={customer ? { firstName: customer.firstName, needsProfile: customer.needsProfile, avatarUrl: customer.avatarUrl } : null}
+        />
+        <main className="flex-1">{children}</main>
+        <SiteFooter locale={locale} />
+        <WhatsAppButton />
+      </WishlistProvider>
     </CartProvider>
   );
 }

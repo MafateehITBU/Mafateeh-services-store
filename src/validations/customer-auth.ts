@@ -1,31 +1,13 @@
+import { findCountry, isValidNationalNumber } from "@/lib/countries";
 import { z } from "zod";
 
-export const countryCodes = ["+966", "+962", "+971", "+965", "+974", "+973", "+968", "+20", "+961", "+970", "+1", "+44"] as const;
+export { isValidNationalNumber, normalizeNationalNumber } from "@/lib/countries";
 
-const nationalPatterns: Record<(typeof countryCodes)[number], RegExp> = {
-  "+966": /^5\d{8}$/,
-  "+962": /^7\d{8}$/,
-  "+971": /^5\d{8}$/,
-  "+965": /^[569]\d{7}$/,
-  "+974": /^[3567]\d{7}$/,
-  "+973": /^[36]\d{7}$/,
-  "+968": /^[79]\d{7}$/,
-  "+20": /^1\d{9}$/,
-  "+961": /^[37]\d{6,7}$/,
-  "+970": /^5\d{8}$/,
-  "+1": /^[2-9]\d{9}$/,
-  "+44": /^7\d{9}$/,
-};
-
-export function normalizeNationalNumber(value: string) {
-  const digits = value.replace(/\D/g, "");
-  return digits.startsWith("0") ? digits.slice(1) : digits;
-}
-
-export function isValidNationalNumber(countryCode: string, value: string) {
-  const pattern = nationalPatterns[countryCode as (typeof countryCodes)[number]];
-  return Boolean(pattern?.test(normalizeNationalNumber(value)));
-}
+const imageDataUrl = z
+  .string()
+  .trim()
+  .max(7_000_000)
+  .regex(/^data:image\/(png|jpeg|webp);base64,[A-Za-z0-9+/]+={0,2}$/);
 
 export const customerEmailSchema = z.object({
   email: z.string().trim().email().max(254),
@@ -36,13 +18,28 @@ export const customerCodeSchema = z.object({
   code: z.string().regex(/^\d{4}$/),
 });
 
-export const customerProfileSchema = z.object({
-  firstName: z.string().trim().min(1).max(60),
-  lastName: z.string().trim().min(1).max(60),
-  countryCode: z.enum(countryCodes),
-  phone: z.string().trim(),
-}).superRefine((value, context) => {
-  if (!isValidNationalNumber(value.countryCode, value.phone)) {
+function withPhone<T extends { countryIso: string; phone: string }>(value: T, context: z.RefinementCtx) {
+  if (!findCountry(value.countryIso) || !isValidNationalNumber(value.countryIso, value.phone)) {
     context.addIssue({ code: "custom", path: ["phone"], message: "invalid_phone" });
   }
-});
+}
+
+export const customerProfileSchema = z
+  .object({
+    firstName: z.string().trim().min(1).max(60),
+    lastName: z.string().trim().min(1).max(60),
+    countryIso: z.string().trim().toUpperCase().length(2),
+    phone: z.string().trim(),
+  })
+  .superRefine(withPhone);
+
+export const customerAccountSchema = z
+  .object({
+    firstName: z.string().trim().min(1).max(60),
+    lastName: z.string().trim().min(1).max(60),
+    email: z.string().trim().email().max(254),
+    countryIso: z.string().trim().toUpperCase().length(2),
+    phone: z.string().trim(),
+    avatar: imageDataUrl.optional(),
+  })
+  .superRefine(withPhone);

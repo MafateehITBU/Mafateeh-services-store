@@ -1,19 +1,97 @@
 "use client";
 
-import { StoredImage } from "@/components/ui/stored-image";
-import type { PublicTestimonial } from "@/features/reviews/types";
-import { Link } from "@/i18n/navigation";
-import { ChevronLeft, ChevronRight, Star } from "lucide-react";
+import { Quote, Star } from "lucide-react";
 import { useLocale, useTranslations } from "next-intl";
 import { useEffect, useRef, useState } from "react";
 
-export function TestimonialCarousel({ items }: { items: PublicTestimonial[] }) {
+const testimonials = {
+  en: [
+    {
+      id: "sara",
+      name: "Sara Al-Harbi",
+      place: "Riyadh",
+      quote: "Finding the right service took minutes. The details were clear, and the order felt straightforward from the first step.",
+    },
+    {
+      id: "omar",
+      name: "Omar Khalid",
+      place: "Amman",
+      quote: "I liked how organized everything is. I could compare what I needed, add it, and know exactly what I was getting.",
+    },
+    {
+      id: "lina",
+      name: "Lina Haddad",
+      place: "Dubai",
+      quote: "The experience feels calm and professional. I knew who to contact, and the service matched what was described.",
+    },
+    {
+      id: "noura",
+      name: "Noura Al-Mutairi",
+      place: "Jeddah",
+      quote: "The service page told me everything I needed before I decided. Nothing felt hidden, and the next step was obvious.",
+    },
+    {
+      id: "youssef",
+      name: "Youssef Nasser",
+      place: "Cairo",
+      quote: "I came back because the first order was simple. The same clear layout made the second one even faster.",
+    },
+    {
+      id: "maya",
+      name: "Maya Saleh",
+      place: "Kuwait City",
+      quote: "It feels like a store that respects your time. I found the service, checked the details, and finished without confusion.",
+    },
+  ],
+  ar: [
+    {
+      id: "sara",
+      name: "سارة الحربي",
+      place: "الرياض",
+      quote: "العثور على الخدمة المناسبة استغرق دقائق. التفاصيل كانت واضحة، والطلب بدا بسيطًا من الخطوة الأولى.",
+    },
+    {
+      id: "omar",
+      name: "عمر خالد",
+      place: "عمّان",
+      quote: "أعجبني ترتيب كل شيء. استطعت مقارنة ما أحتاجه وإضافته، وأعرف تمامًا ما سأحصل عليه.",
+    },
+    {
+      id: "lina",
+      name: "لينا حداد",
+      place: "دبي",
+      quote: "التجربة هادئة ومهنية. عرفت كيف أتواصل، والخدمة طابقت ما هو موصوف.",
+    },
+    {
+      id: "noura",
+      name: "نورة المطيري",
+      place: "جدة",
+      quote: "صفحة الخدمة أخبرتني بكل ما أحتاجه قبل أن أقرر. لم أشعر أن شيئًا مخفي، والخطوة التالية كانت واضحة.",
+    },
+    {
+      id: "youssef",
+      name: "يوسف ناصر",
+      place: "القاهرة",
+      quote: "عدت لأن الطلب الأول كان بسيطًا. نفس الترتيب الواضح جعل الطلب الثاني أسرع.",
+    },
+    {
+      id: "maya",
+      name: "مايا صالح",
+      place: "الكويت",
+      quote: "يبدو كمتجر يحترم وقتك. وجدت الخدمة، راجعت التفاصيل، وأنهيت دون ارتباك.",
+    },
+  ],
+} as const;
+
+export function TestimonialCarousel() {
   const t = useTranslations("Testimonials");
-  const locale = useLocale();
+  const locale = useLocale() === "ar" ? "ar" : "en";
+  const items = testimonials[locale];
   const viewport = useRef<HTMLDivElement>(null);
   const track = useRef<HTMLDivElement>(null);
   const [index, setIndex] = useState(0);
   const [pages, setPages] = useState(1);
+  const [paused, setPaused] = useState(false);
   const indexRef = useRef(0);
   const startX = useRef<number | null>(null);
   const reduced = useRef(false);
@@ -23,11 +101,13 @@ export function TestimonialCarousel({ items }: { items: PublicTestimonial[] }) {
     const card = view?.querySelector<HTMLElement>("[data-card]");
 
     if (!view || !card) {
-      return { visible: 1, step: view?.clientWidth ?? 0, max: 0 };
+      return { step: view?.clientWidth ?? 0, max: 0 };
     }
 
-    const gap = 16;
-    const visible = Math.max(1, Math.round((view.clientWidth + gap) / (card.offsetWidth + gap)));
+    const gap = 40;
+    const styles = getComputedStyle(view);
+    const width = view.clientWidth - Number.parseFloat(styles.paddingLeft) - Number.parseFloat(styles.paddingRight);
+    const visible = Math.max(1, Math.round((width + gap) / (card.offsetWidth + gap)));
     return { step: card.offsetWidth + gap, max: Math.max(0, items.length - visible) };
   }
 
@@ -35,47 +115,63 @@ export function TestimonialCarousel({ items }: { items: PublicTestimonial[] }) {
     const { step, max } = measure();
     const clamped = Math.min(Math.max(next, 0), max);
     const sign = locale === "ar" ? 1 : -1;
+
     if (track.current) {
       track.current.style.transform = `translate3d(${sign * clamped * step}px, 0, 0)`;
     }
+
     indexRef.current = clamped;
     setIndex(clamped);
     setPages(max + 1);
   }
 
+  const applyRef = useRef(apply);
+  const measureRef = useRef(measure);
+
+  useEffect(() => {
+    applyRef.current = apply;
+    measureRef.current = measure;
+  });
+
   useEffect(() => {
     reduced.current = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
     const view = viewport.current;
+
     if (!view) {
       return;
     }
+
     const observer = new ResizeObserver(() => {
-      window.requestAnimationFrame(() => apply(indexRef.current));
+      window.requestAnimationFrame(() => applyRef.current(indexRef.current));
     });
     observer.observe(view);
     return () => observer.disconnect();
-  }, [items.length, locale]);
+  }, [locale]);
 
-  if (items.length === 0) {
-    return (
-      <section aria-labelledby="customer-reviews-title" className="bg-[#f3f8f4] py-12">
-        <div className="mx-auto max-w-xl px-4 text-center">
-          <h2 id="customer-reviews-title" className="text-3xl font-bold">{t("title")}</h2>
-          <p className="mt-3 text-sm leading-6 text-muted">{t("empty")}</p>
-        </div>
-      </section>
-    );
-  }
+  useEffect(() => {
+    if (pages < 2 || paused || reduced.current) {
+      return;
+    }
 
-  const atStart = index === 0;
-  const atEnd = index >= pages - 1;
-  const PreviousIcon = locale === "ar" ? ChevronRight : ChevronLeft;
-  const NextIcon = locale === "ar" ? ChevronLeft : ChevronRight;
+    const timer = window.setInterval(() => {
+      const { max } = measureRef.current();
+      const next = indexRef.current >= max ? 0 : indexRef.current + 1;
+
+      if (track.current) {
+        track.current.style.transitionDuration = reduced.current ? "0ms" : "500ms";
+      }
+
+      applyRef.current(next);
+    }, 5000);
+
+    return () => window.clearInterval(timer);
+  }, [pages, paused, index, locale]);
 
   function go(next: number) {
     if (track.current) {
       track.current.style.transitionDuration = reduced.current ? "0ms" : "500ms";
     }
+
     apply(next);
   }
 
@@ -83,13 +179,19 @@ export function TestimonialCarousel({ items }: { items: PublicTestimonial[] }) {
     <section
       aria-roledescription="carousel"
       aria-labelledby="customer-reviews-title"
-      className="bg-[#f3f8f4] py-14 md:py-16"
+      className="overflow-hidden bg-[#f3f8f4] py-14 md:py-16"
+      onMouseEnter={() => setPaused(true)}
+      onMouseLeave={() => setPaused(false)}
+      onFocus={() => setPaused(true)}
+      onBlur={() => setPaused(false)}
       onKeyDown={(event) => {
         const forward = locale === "ar" ? event.key === "ArrowLeft" : event.key === "ArrowRight";
         const backward = locale === "ar" ? event.key === "ArrowRight" : event.key === "ArrowLeft";
+
         if (forward) {
           go(index + 1);
         }
+
         if (backward) {
           go(index - 1);
         }
@@ -98,88 +200,62 @@ export function TestimonialCarousel({ items }: { items: PublicTestimonial[] }) {
     >
       <div className="mx-auto max-w-[var(--container)] px-4 md:px-6">
         <h2 id="customer-reviews-title" className="text-center text-3xl font-bold md:text-4xl">{t("title")}</h2>
-        <div ref={viewport} className="@container mt-10 overflow-hidden">
+        <div ref={viewport} className="@container mt-8 overflow-hidden px-4 py-8">
           <div
             ref={track}
-            className="flex gap-4 transition-transform ease-out motion-reduce:transition-none"
+            className="flex items-stretch gap-10 transition-transform ease-out motion-reduce:transition-none"
             onTouchStart={(event) => {
               startX.current = event.changedTouches[0]?.clientX ?? null;
+              setPaused(true);
             }}
             onTouchEnd={(event) => {
               if (startX.current == null) {
                 return;
               }
+
               const delta = (event.changedTouches[0]?.clientX ?? startX.current) - startX.current;
               const next = locale === "ar" ? delta > 40 : delta < -40;
               const previous = locale === "ar" ? delta < -40 : delta > 40;
+
               if (next) {
                 go(index + 1);
               }
+
               if (previous) {
                 go(index - 1);
               }
+
               startX.current = null;
+              setPaused(false);
             }}
           >
             {items.map((item) => (
-              <div key={item.id} data-card className="flex w-[100cqw] shrink-0 md:w-[calc((100cqw-1rem)/2)] xl:w-[calc((100cqw-2rem)/3)]">
-                <TestimonialCard item={item} />
-              </div>
+              <article
+                key={item.id}
+                data-card
+                dir={locale === "ar" ? "rtl" : "ltr"}
+                className="flex w-[100cqw] shrink-0 flex-col rounded-3xl border border-brand/20 bg-white p-6 shadow-[0_12px_22px_-8px_rgba(12,61,30,0.28)] md:w-[calc((100cqw-2.5rem)/2)] xl:w-[calc((100cqw-5rem)/3)]"
+              >
+                <Quote aria-hidden="true" className="size-8 text-[#dfb026]" />
+                <p className="mt-4 flex-1 text-base leading-7 text-ink">{item.quote}</p>
+                <p className="mt-5 flex gap-1">
+                  <span className="sr-only">{t("stars", { count: 5 })}</span>
+                  {Array.from({ length: 5 }, (_, star) => (
+                    <Star key={star} aria-hidden="true" className="size-4 fill-[#dfb026] text-[#dfb026]" />
+                  ))}
+                </p>
+                <div className="mt-4 flex items-center gap-3 border-t border-[#eef2ef] pt-4">
+                  <span className="inline-flex size-11 shrink-0 items-center justify-center rounded-full bg-[#157037] text-sm font-bold text-white">{item.name.slice(0, 1)}</span>
+                  <div>
+                    <p className="font-bold">{item.name}</p>
+                    <p className="text-sm text-[#5d6b62]">{item.place}</p>
+                  </div>
+                </div>
+              </article>
             ))}
           </div>
         </div>
-        <div className="mt-6 flex items-center justify-center gap-3">
-          <button type="button" aria-label={t("previous")} aria-disabled={atStart} disabled={atStart} onClick={() => go(index - 1)} className="inline-flex size-11 cursor-pointer items-center justify-center rounded-full border border-brand/20 bg-white text-ink disabled:cursor-not-allowed disabled:opacity-40">
-            <PreviousIcon aria-hidden="true" className="size-5" />
-          </button>
-          {Array.from({ length: pages }, (_, page) => (
-            <button
-              key={page}
-              type="button"
-              aria-label={t("page", { index: page + 1 })}
-              aria-current={page === index}
-              onClick={() => go(page)}
-              className={`size-2.5 cursor-pointer rounded-full ${page === index ? "bg-[#ca9733]" : "bg-brand/20"}`}
-            />
-          ))}
-          <button type="button" aria-label={t("next")} aria-disabled={atEnd} disabled={atEnd} onClick={() => go(index + 1)} className="inline-flex size-11 cursor-pointer items-center justify-center rounded-full border border-brand/20 bg-white text-ink disabled:cursor-not-allowed disabled:opacity-40">
-            <NextIcon aria-hidden="true" className="size-5" />
-          </button>
-        </div>
       </div>
     </section>
-  );
-}
-
-function TestimonialCard({ item }: { item: PublicTestimonial }) {
-  const t = useTranslations("Testimonials");
-  const initials = item.name.slice(0, 1);
-
-  return (
-    <article className="flex h-full min-h-64 flex-col rounded-2xl border border-brand/20 bg-white p-5">
-      {item.preview ? <p className="text-xs font-semibold text-brand">{t("preview")}</p> : null}
-      <div className="mt-3 flex items-center gap-3">
-        {item.avatarUrl ? (
-          <StoredImage src={item.avatarUrl} alt="" className="size-12 shrink-0 rounded-full" />
-        ) : (
-          <span className="inline-flex size-12 shrink-0 items-center justify-center rounded-full bg-[#e7f5ec] text-sm font-bold text-brand">{initials}</span>
-        )}
-        <div>
-          <p className="font-bold">{item.name}</p>
-          {item.location ? <p className="text-sm text-muted">{item.location}</p> : null}
-        </div>
-      </div>
-      <p className="mt-3 flex gap-1" aria-label={t("stars", { count: item.rating })}>
-        {Array.from({ length: 5 }, (_, star) => (
-          <Star key={star} aria-hidden="true" className={`size-4 ${star < item.rating ? "fill-[#dfb026] text-[#dfb026]" : "text-line"}`} />
-        ))}
-      </p>
-      <p className="mt-3 flex-1 text-sm leading-7 text-ink">{item.comment}</p>
-      {item.serviceHref ? (
-        <Link href={item.serviceHref} className="mt-4 cursor-pointer text-sm font-semibold text-brand">
-          {t("read")}
-        </Link>
-      ) : null}
-    </article>
   );
 }

@@ -9,12 +9,14 @@ export function StoredImage({
   className,
   fit = "cover",
   sizing = "intrinsic",
+  position = "center",
 }: {
   src: string | null;
   alt: string;
   className?: string;
   fit?: "cover" | "contain";
   sizing?: "intrinsic" | "frame";
+  position?: "center" | "bottom";
 }) {
   const [failed, setFailed] = useState(false);
   const stored = Boolean(src?.startsWith("data:image/"));
@@ -38,6 +40,7 @@ export function StoredImage({
           sizing === "frame" && "absolute inset-0 h-full w-full object-contain",
           sizing === "intrinsic" && fit === "contain" && "block h-auto w-full object-contain",
           sizing === "intrinsic" && fit === "cover" && "absolute inset-0 h-full w-full object-cover",
+          position === "bottom" && "object-bottom",
         )}
         onError={() => setFailed(true)}
       />

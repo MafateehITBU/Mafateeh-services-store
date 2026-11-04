@@ -29,7 +29,7 @@ export function BrandLogo({ alt, variant = "color", className, priority = false 
       width={438}
       height={117}
       priority={priority}
-      className={cn("h-11 w-auto max-w-[10.5rem] sm:h-12 sm:max-w-none md:h-16", className)}
+        className={cn("h-8 w-auto max-w-full sm:h-10 md:h-16", className)}
     />
   );
 }

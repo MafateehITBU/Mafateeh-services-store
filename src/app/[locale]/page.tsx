@@ -5,7 +5,6 @@ import { PromoFeature } from "@/components/storefront/promo-banners";
 import { TestimonialCarousel } from "@/components/storefront/testimonial-carousel";
 import { getPublicCategoryTree } from "@/features/categories/get-public-categories";
 import { getPublicHomepage } from "@/features/homepage/get-public-homepage";
-import { listHomepageTestimonials } from "@/features/reviews/get-public-testimonials";
 import { routing, type AppLocale } from "@/i18n/routing";
 import { hasLocale } from "next-intl";
 import { getTranslations, setRequestLocale } from "next-intl/server";
@@ -51,9 +50,6 @@ export default async function HomePage({ params }: HomePageProps) {
     getPublicCategoryTree(language),
     getTranslations("Store"),
   ]);
-  const showReviews = homepage.blocks.some((block) => block.type === "TESTIMONIAL_CAROUSEL");
-  const testimonials = showReviews ? await listHomepageTestimonials(language) : [];
-
   return (
     <div className="bg-white">
       {homepage.blocks.map((block, index) => {
@@ -81,7 +77,11 @@ export default async function HomePage({ params }: HomePageProps) {
           return <HomeSections key={block.id} sections={[block.section]} />;
         }
 
-        return <TestimonialCarousel key={block.id} items={testimonials} />;
+        if (block.type === "TESTIMONIAL_CAROUSEL") {
+          return <TestimonialCarousel key={block.id} />;
+        }
+
+        return null;
       })}
       {homepage.blocks.length > 0 ? null : (
         <section className="mx-auto max-w-xl px-4 py-16 text-center">

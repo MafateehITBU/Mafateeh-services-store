@@ -2,6 +2,7 @@ import "server-only";
 
 import { prisma } from "@/lib/prisma";
 import { writeAdminAuditLog } from "@/server/admin/audit";
+import { creditLoyaltyForOrder } from "@/server/storefront/loyalty";
 import { dayRange } from "@/validations/admin-operations";
 import type { OrderStatus, PaymentStatus, Prisma } from "@/generated/prisma/client";
 
@@ -251,6 +252,10 @@ export async function updateOrderStatus(actorId: string, id: string, status: Ord
 
     if (saved.paymentStatus !== current.paymentStatus) {
       throw new OrderRuleError("Payment status cannot change with the order status.");
+    }
+
+    if ((status === "PAID" || status === "PROCESSING" || status === "COMPLETED") && saved.paymentStatus === "PAID") {
+      await creditLoyaltyForOrder(tx, id);
     }
 
     return saved;

@@ -4,7 +4,6 @@ import { useCallback, useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { ConfirmDialog } from "@/components/dashboard/confirm-dialog";
 import { DataTable } from "@/components/dashboard/data-table";
-import { EmptyState } from "@/components/dashboard/empty-state";
 import { LoadingState } from "@/components/dashboard/loading-state";
 import { StatusBadge, statusLabel, statusTone } from "@/components/dashboard/status-badge";
 
@@ -73,6 +72,22 @@ export function ReviewsManager() {
     }, 0);
     return () => window.clearTimeout(timer);
   }, [load]);
+
+  useEffect(() => {
+    if (!selected || pendingDelete) {
+      return;
+    }
+
+    function onKeyDown(event: KeyboardEvent) {
+      if (event.key === "Escape") {
+        event.preventDefault();
+        setSelected(null);
+      }
+    }
+
+    document.addEventListener("keydown", onKeyDown);
+    return () => document.removeEventListener("keydown", onKeyDown);
+  }, [pendingDelete, selected]);
 
   async function moderate(review: ReviewRow, next: "APPROVED" | "REJECTED") {
     setBusy(true);
@@ -143,68 +158,69 @@ export function ReviewsManager() {
         <input className={fieldClass} type="date" value={to} onChange={(event) => { setTo(event.target.value); setPage(1); }} aria-label="To date" />
       </form>
       {notice ? <p className="rounded-xl bg-brand/10 px-4 py-3 text-sm text-brand-rich">{notice}</p> : null}
-      {error ? <p className="rounded-xl bg-danger/10 px-4 py-3 text-sm text-danger">{error}</p> : null}
+      {error && !selected ? <p className="rounded-xl bg-danger/10 px-4 py-3 text-sm text-danger">{error}</p> : null}
       {loading ? <LoadingState /> : null}
-      {!loading && data && data.reviews.length === 0 ? (
-        <EmptyState title="No reviews" body="Reviews submitted by customers will appear here for moderation." />
-      ) : null}
-      {!loading && data && data.reviews.length > 0 ? (
-        <DataTable
-          tableClassName="min-w-[64rem]"
-          columns={[
-            { key: "customer", header: "Customer", cell: (row) => row.customerName },
-            { key: "service", header: "Service", cell: (row) => row.serviceName },
-            { key: "rating", header: "Rating", cell: (row) => row.rating },
-            { key: "comment", header: "Comment", cell: (row) => <span className="line-clamp-2 max-w-xs">{row.comment}</span> },
-            { key: "date", header: "Submitted", cell: (row) => row.createdAt.slice(0, 10) },
-            {
-              key: "status",
-              header: "Status",
-              cell: (row) => <StatusBadge tone={statusTone(row.status)}>{statusLabel(row.status)}</StatusBadge>,
-            },
-            {
-              key: "actions",
-              header: "Actions",
-              cell: (row) => (
-                <Button variant="secondary" className="min-h-9 px-4" onClick={() => setSelected(row)}>
-                  View
-                </Button>
-              ),
-            },
-          ]}
-          rows={data.reviews}
-          emptyTitle="No reviews"
-          emptyBody="Reviews submitted by customers will appear here for moderation."
-        />
-      ) : null}
-      {data && data.pageCount > 1 ? (
-        <div className="flex items-center justify-between">
-          <p className="text-sm text-muted">Page {data.page} of {data.pageCount}</p>
-          <div className="flex gap-2">
-            <Button variant="secondary" disabled={page <= 1} onClick={() => setPage((value) => value - 1)}>Previous</Button>
-            <Button variant="secondary" disabled={page >= data.pageCount} onClick={() => setPage((value) => value + 1)}>Next</Button>
+      {!loading && data ? (
+        <article className="rounded-2xl border border-line bg-white p-4 shadow-[var(--shadow-soft)]">
+          <DataTable
+            tableClassName="min-w-[64rem]"
+            columns={[
+              { key: "customer", header: "Customer", cell: (row) => row.customerName },
+              { key: "service", header: "Service", cell: (row) => row.serviceName },
+              { key: "rating", header: "Rating", cell: (row) => row.rating },
+              { key: "comment", header: "Comment", cell: (row) => <span className="line-clamp-2 max-w-xs">{row.comment}</span> },
+              { key: "date", header: "Submitted", cell: (row) => row.createdAt.slice(0, 10) },
+              {
+                key: "status",
+                header: "Status",
+                cell: (row) => <StatusBadge tone={statusTone(row.status)}>{statusLabel(row.status)}</StatusBadge>,
+              },
+              {
+                key: "actions",
+                header: "Actions",
+                cell: (row) => (
+                  <Button variant="secondary" className="min-h-9 px-4" onClick={() => setSelected(row)}>
+                    View
+                  </Button>
+                ),
+              },
+            ]}
+            rows={data.reviews}
+            emptyTitle="No reviews"
+            emptyBody="Reviews submitted by customers will appear here for moderation."
+          />
+          <div className="mt-4 flex items-center justify-between gap-3">
+            <p className="text-sm text-muted">Page {data.page} of {data.pageCount}</p>
+            <div className="flex gap-2">
+              <Button variant="secondary" disabled={page <= 1} onClick={() => setPage((value) => value - 1)}>Previous</Button>
+              <Button variant="secondary" disabled={page >= data.pageCount} onClick={() => setPage((value) => value + 1)}>Next</Button>
+            </div>
           </div>
-        </div>
+        </article>
       ) : null}
       {selected ? (
-        <section className="rounded-2xl border border-line bg-white p-5 shadow-[var(--shadow-soft)]">
-          <div className="flex flex-wrap items-start justify-between gap-3">
-            <div>
-              <h2 className="text-lg font-bold">{selected.customerName}</h2>
-              <p className="text-sm text-muted">{selected.customerEmail} · {selected.serviceName}</p>
+        <div className="fixed inset-0 z-[80] flex items-end justify-center p-4 sm:items-center">
+          <button type="button" aria-label="Close review" className="absolute inset-0 cursor-pointer bg-brand-deep/45" onClick={() => setSelected(null)} />
+          <div role="dialog" aria-modal="true" aria-labelledby="review-dialog-title" className="relative max-h-[90vh] w-full max-w-xl overflow-y-auto rounded-3xl bg-white p-6 shadow-[var(--shadow-panel)]">
+            <div className="flex items-start justify-between gap-4">
+              <div>
+                <h2 id="review-dialog-title" className="text-xl font-bold">{selected.customerName}</h2>
+                <p className="mt-1 text-sm text-muted">{selected.customerEmail} · {selected.serviceName}</p>
+              </div>
+              <StatusBadge tone={statusTone(selected.status)}>{statusLabel(selected.status)}</StatusBadge>
             </div>
-            <StatusBadge tone={statusTone(selected.status)}>{statusLabel(selected.status)}</StatusBadge>
+            <p className="mt-4 text-sm font-semibold">{selected.rating} out of 5{selected.verifiedPurchase ? " · Verified purchase" : ""}</p>
+            <p className="mt-2 whitespace-pre-wrap text-sm leading-6">{selected.comment}</p>
+            <p className="mt-2 text-xs text-muted">Submitted {selected.createdAt.slice(0, 16).replace("T", " ")}</p>
+            {error ? <p className="mt-4 rounded-xl bg-danger/10 px-4 py-3 text-sm text-danger">{error}</p> : null}
+            <div className="mt-6 flex flex-wrap justify-end gap-2">
+              <Button disabled={busy} onClick={() => void moderate(selected, "APPROVED")}>Approve</Button>
+              <Button variant="secondary" disabled={busy} onClick={() => void moderate(selected, "REJECTED")}>Reject</Button>
+              <Button variant="secondary" disabled={busy} onClick={() => setPendingDelete(selected)}>Delete</Button>
+              <Button variant="secondary" onClick={() => setSelected(null)}>Close</Button>
+            </div>
           </div>
-          <p className="mt-4 text-sm font-semibold">{selected.rating} out of 5{selected.verifiedPurchase ? " · Verified purchase" : ""}</p>
-          <p className="mt-2 whitespace-pre-wrap text-sm leading-6">{selected.comment}</p>
-          <p className="mt-2 text-xs text-muted">Submitted {selected.createdAt.slice(0, 16).replace("T", " ")}</p>
-          <div className="mt-4 flex flex-wrap gap-2">
-            <Button disabled={busy} onClick={() => void moderate(selected, "APPROVED")}>Approve</Button>
-            <Button variant="secondary" disabled={busy} onClick={() => void moderate(selected, "REJECTED")}>Reject</Button>
-            <Button variant="secondary" disabled={busy} onClick={() => setPendingDelete(selected)}>Delete</Button>
-            <Button variant="secondary" onClick={() => setSelected(null)}>Close</Button>
-          </div>
-        </section>
+        </div>
       ) : null}
       <ConfirmDialog
         open={Boolean(pendingDelete)}

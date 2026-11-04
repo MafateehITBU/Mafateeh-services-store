@@ -375,7 +375,7 @@ function describeBlock(block: LayoutBlock, data: HomepagePayload, hero: Banner[]
     return { type: section ? sectionLabels[section.type] : "Section", en: section?.en.title || "Section", ar: section?.ar.title || "قسم", detail: section?.type === "FEATURED_CATEGORIES" ? section.categoryTitle ?? "Category" : `${section?.serviceIds.length ?? 0} services`, image: null, inactive: !section?.isActive };
   }
   if (block.type === "CATEGORY_CAROUSEL") return { type: "Category Carousel", en: "Explore Our Solutions", ar: "اكتشف حلولنا", detail: `${data.categories.length} active categories`, image: null, inactive: false };
-  return { type: "Testimonials", en: "What Our Customers Say", ar: "آراء عملائنا", detail: `${data.approvedReviewCount} approved reviews`, image: null, inactive: false };
+  return { type: "Testimonials", en: "What Our Customers Say", ar: "آراء عملائنا", detail: "6 static testimonials", image: null, inactive: false };
 }
 
 function StructureRow({ block, index, count, summary, onMove, onEdit, onVisibility, onDelete }: { block: LayoutBlock; index: number; count: number; summary: ReturnType<typeof describeBlock>; onMove: (direction: -1 | 1) => void; onEdit: () => void; onVisibility: () => void; onDelete: () => void }) {

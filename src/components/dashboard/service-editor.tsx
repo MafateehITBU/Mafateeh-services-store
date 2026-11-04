@@ -23,6 +23,7 @@ type ServicePayload = {
   coverImageUrl: string | null;
   basePrice: string;
   currency: string;
+  loyaltyPoints: number;
   isFeatured: boolean;
   sortOrder: number;
   status: "draft" | "published" | "inactive";
@@ -70,6 +71,7 @@ export function ServiceEditor({ serviceId, readOnly }: { serviceId?: string; rea
   const [categoryId, setCategoryId] = useState("");
   const [cover, setCover] = useState<string | null>(null);
   const [basePrice, setBasePrice] = useState("");
+  const [loyaltyPoints, setLoyaltyPoints] = useState("0");
   const [currency, setCurrency] = useState("JOD");
   const [customCurrency, setCustomCurrency] = useState(false);
   const [isFeatured, setIsFeatured] = useState(false);
@@ -115,6 +117,7 @@ export function ServiceEditor({ serviceId, readOnly }: { serviceId?: string; rea
         setCategoryId(service.categoryId);
         setCover(service.coverImageUrl);
         setBasePrice(service.basePrice);
+        setLoyaltyPoints(String(service.loyaltyPoints ?? 0));
         setCurrency(service.currency);
         setCustomCurrency(!commonCurrencies.includes(service.currency as (typeof commonCurrencies)[number]));
         setIsFeatured(service.isFeatured);
@@ -139,6 +142,7 @@ export function ServiceEditor({ serviceId, readOnly }: { serviceId?: string; rea
       sku: null,
       cover,
       basePrice,
+      loyaltyPoints,
       compareAtPrice: null,
       currency,
       isFeatured,
@@ -397,6 +401,8 @@ export function ServiceEditor({ serviceId, readOnly }: { serviceId?: string; rea
         <h2 className="text-lg font-bold">Pricing</h2>
         <div className="mt-4 grid gap-4 md:grid-cols-2">
           <Field label="Price" value={basePrice} disabled={readOnly} onChange={setBasePrice} />
+          <Field label="Loyalty points" value={loyaltyPoints} disabled={readOnly} onChange={(value) => setLoyaltyPoints(value.replace(/\D/g, "").slice(0, 7))} />
+          <p className="text-sm text-muted md:col-span-2">Points the customer earns for each unit of this service that is purchased.</p>
           <label className="text-sm font-semibold">
             Currency
             <select

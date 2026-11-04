@@ -1,7 +1,8 @@
 "use client";
 
+import { PhoneField } from "@/components/storefront/phone-field";
 import { Overlay } from "@/components/ui/overlay";
-import { countryCodes, isValidNationalNumber, normalizeNationalNumber } from "@/validations/customer-auth";
+import { isValidNationalNumber, normalizeNationalNumber } from "@/validations/customer-auth";
 import { ArrowLeft, UserRound, X } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useTranslations } from "next-intl";
@@ -32,7 +33,7 @@ export function AccountModal({ open, needsProfile, onClose }: AccountModalProps)
   const [error, setError] = useState<string | null>(null);
   const [firstName, setFirstName] = useState("");
   const [lastName, setLastName] = useState("");
-  const [countryCode, setCountryCode] = useState<(typeof countryCodes)[number]>("+966");
+  const [countryIso, setCountryIso] = useState("SA");
   const [phone, setPhone] = useState("");
   const inputs = useRef<Array<HTMLInputElement | null>>([]);
   const checking = useRef(false);
@@ -148,7 +149,7 @@ export function AccountModal({ open, needsProfile, onClose }: AccountModalProps)
       return;
     }
 
-    if (!isValidNationalNumber(countryCode, phone)) {
+    if (!isValidNationalNumber(countryIso, phone)) {
       setError(t("phoneInvalid"));
       return;
     }
@@ -158,7 +159,7 @@ export function AccountModal({ open, needsProfile, onClose }: AccountModalProps)
     const response = await fetch("/api/auth/profile", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ firstName, lastName, countryCode, phone: normalizeNationalNumber(phone) }),
+      body: JSON.stringify({ firstName, lastName, countryIso, phone: normalizeNationalNumber(phone) }),
     });
     setPending(false);
 
@@ -280,17 +281,20 @@ export function AccountModal({ open, needsProfile, onClose }: AccountModalProps)
               {t("lastNameLabel")}
               <input required value={lastName} onChange={(event) => setLastName(event.target.value)} placeholder={t("lastNamePlaceholder")} className="mt-1 h-11 w-full rounded-lg border border-[#e5e7eb] px-3 text-sm outline-none focus:border-[#111827]" />
             </label>
-            <label className="block text-start text-sm text-[#6b7280]">
+            <div className="block text-start text-sm text-[#6b7280]">
               {t("phoneLabel")}
-              <span className="mt-1 flex h-11 overflow-hidden rounded-lg border border-[#e5e7eb]" dir="ltr">
-                <select value={countryCode} onChange={(event) => setCountryCode(event.target.value as (typeof countryCodes)[number])} aria-label={t("countryCode")} className="bg-transparent px-2 text-sm outline-none">
-                  {countryCodes.map((code) => (
-                    <option key={code} value={code}>{code}</option>
-                  ))}
-                </select>
-                <input required inputMode="numeric" value={phone} onChange={(event) => setPhone(event.target.value.replace(/\D/g, "").slice(0, 15))} placeholder="512345678" className="min-w-0 flex-1 px-2 text-sm outline-none" />
-              </span>
-            </label>
+              <div className="mt-1">
+                <PhoneField
+                  countryIso={countryIso}
+                  onCountryIso={setCountryIso}
+                  phone={phone}
+                  onPhone={setPhone}
+                  searchLabel={t("searchCountry")}
+                  countryLabel={t("countryCode")}
+                  numberLabel={t("phoneLabel")}
+                />
+              </div>
+            </div>
             {error ? <p className="text-sm text-[#9a3412]">{error}</p> : null}
             <button type="submit" disabled={pending} className="inline-flex h-11 w-full cursor-pointer items-center justify-center rounded-lg bg-[#111827] text-sm font-semibold text-white hover:bg-[#0b1220] disabled:cursor-not-allowed disabled:opacity-60">
               {t("register")}

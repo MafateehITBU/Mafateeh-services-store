@@ -1,3 +1,4 @@
+import { findCountry } from "@/lib/countries";
 import { saveCustomerProfile } from "@/server/auth/customer-otp";
 import { customerProfileSchema, normalizeNationalNumber } from "@/validations/customer-auth";
 
@@ -10,10 +11,17 @@ export async function POST(request: Request) {
   }
 
   try {
+    const country = findCountry(parsed.data.countryIso);
+
+    if (!country) {
+      return Response.json({ error: "invalid_phone" }, { status: 400 });
+    }
+
     const result = await saveCustomerProfile({
       firstName: parsed.data.firstName,
       lastName: parsed.data.lastName,
-      phone: `${parsed.data.countryCode}${normalizeNationalNumber(parsed.data.phone)}`,
+      phone: `+${country.dial}${normalizeNationalNumber(parsed.data.phone)}`,
+      phoneCountry: country.iso,
     });
 
     if (!result.ok) {

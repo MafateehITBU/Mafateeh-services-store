@@ -109,6 +109,7 @@ model User {
   firstName          String?
   lastName           String?
   phone              String?
+  phoneCountry       String?       @db.VarChar(2)
   avatarUrl          String?
   role               UserRole      @default(CUSTOMER)
   status             AccountStatus @default(ACTIVE)
@@ -193,6 +194,8 @@ model Service {
   basePrice      Decimal   @db.Decimal(12, 3)
   compareAtPrice Decimal?  @db.Decimal(12, 3)
   currency       String    @db.VarChar(3)
+  /// Points credited for each unit when a paid order includes this service.
+  loyaltyPoints  Int       @default(0)
   isActive       Boolean   @default(true)
   isFeatured     Boolean   @default(false)
   sortOrder      Int       @default(0)

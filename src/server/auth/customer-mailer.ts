@@ -4,7 +4,7 @@ import { readAdminDeliveryConfig } from "@/lib/admin-env";
 import nodemailer from "nodemailer";
 import path from "node:path";
 
-function emailHtml(code: string) {
+function emailHtml(code: string, title: string, arabicTitle: string) {
   const digits = code.split("").map((digit) => `<td style="width:52px;height:56px;border-radius:12px;background:#f4f7f5;border:1px solid #d7e5db;font-size:28px;font-weight:700;color:#0c3d1e;text-align:center;">${digit}</td>`).join("");
 
   return `<!doctype html>
@@ -24,8 +24,8 @@ function emailHtml(code: string) {
             </tr>
             <tr>
               <td style="padding:32px 28px 12px;font-family:Arial,Helvetica,sans-serif;color:#0c3d1e;">
-                <h1 style="margin:0;font-size:24px;line-height:1.3;">Your sign-in code</h1>
-                <p style="margin:8px 0 0;font-size:16px;line-height:1.6;color:#3d4d44;">رمز الدخول إلى مفاتيح</p>
+                <h1 style="margin:0;font-size:24px;line-height:1.3;">${title}</h1>
+                <p style="margin:8px 0 0;font-size:16px;line-height:1.6;color:#3d4d44;">${arabicTitle}</p>
               </td>
             </tr>
             <tr>
@@ -50,7 +50,7 @@ function emailHtml(code: string) {
 </html>`;
 }
 
-export async function sendCustomerOtpEmail(to: string, code: string) {
+export async function sendCustomerOtpEmail(to: string, code: string, purpose: "sign-in" | "email-change" = "sign-in") {
   const config = readAdminDeliveryConfig();
   const transport = nodemailer.createTransport({
     host: config.host,
@@ -61,21 +61,22 @@ export async function sendCustomerOtpEmail(to: string, code: string) {
       pass: config.password,
     },
   });
+  const confirmingEmail = purpose === "email-change";
 
   await transport.sendMail({
     from: config.from,
     to,
-    subject: "Mafateeh sign-in code",
+    subject: confirmingEmail ? "Confirm your Mafateeh email" : "Mafateeh sign-in code",
     text: [
-      "Your Mafateeh sign-in code is:",
+      confirmingEmail ? "Use this code to confirm your new Mafateeh email address:" : "Your Mafateeh sign-in code is:",
       code,
       "",
-      "رمز الدخول إلى مفاتيح هو الرمز أعلاه.",
+      confirmingEmail ? "استخدم الرمز أعلاه لتأكيد بريدك الإلكتروني الجديد." : "رمز الدخول إلى مفاتيح هو الرمز أعلاه.",
       "",
       "The code expires in 5 minutes and can be used once.",
       "If you did not request it, you can ignore this email.",
     ].join("\n"),
-    html: emailHtml(code),
+    html: emailHtml(code, confirmingEmail ? "Confirm your new email" : "Your sign-in code", confirmingEmail ? "تأكيد البريد الإلكتروني الجديد" : "رمز الدخول إلى مفاتيح"),
     attachments: [
       {
         filename: "logo-white.png",

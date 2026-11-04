@@ -1,6 +1,5 @@
 import { AdminPageHeader } from "@/components/dashboard/admin-page-header";
 import { DataTable } from "@/components/dashboard/data-table";
-import { EmptyState } from "@/components/dashboard/empty-state";
 import { StatCard } from "@/components/dashboard/stat-card";
 import { StatusBadge, statusLabel, statusTone } from "@/components/dashboard/status-badge";
 import { getDashboardOverview } from "@/server/admin/dashboard";
@@ -125,25 +124,6 @@ export default async function AdminOverviewPage() {
             ))}
           </ul>
         </article>
-      </section>
-      <section className="mt-6 rounded-2xl border border-line bg-white p-5 shadow-[var(--shadow-soft)]">
-        <h2 className="mb-4 text-lg font-bold">Recent activity</h2>
-        {overview.recentActivity.length === 0 ? (
-          <EmptyState title="No administrative activity" body="Changes made from the dashboard will be recorded here." />
-        ) : (
-          <ul className="divide-y divide-line">
-            {overview.recentActivity.map((entry) => (
-              <li key={entry.id} className="py-3">
-                <p className="text-sm font-semibold text-ink">
-                  {entry.action} · {entry.entityType}
-                </p>
-                <p className="mt-1 text-xs text-muted">
-                  {entry.actorEmail} · {formatWhen(entry.createdAt)}
-                </p>
-              </li>
-            ))}
-          </ul>
-        )}
       </section>
     </>
   );

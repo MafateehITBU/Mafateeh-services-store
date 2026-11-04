@@ -22,10 +22,11 @@ export async function SiteFooter({ locale }: { locale: AppLocale }) {
             {t("home")}
           </Link>
         </FooterColumn>
-        <FooterColumn title={t("company")}>
-          <ExternalLink href={details.about}>{t("about")}</ExternalLink>
-          <ExternalLink href={details.services}>{t("services")}</ExternalLink>
-          <ExternalLink href={details.contact}>{t("contact")}</ExternalLink>
+        <FooterColumn title={t("policies")}>
+          <Link href="/privacy" className="cursor-pointer hover:text-brand-gold">{t("privacy")}</Link>
+          <Link href="/terms" className="cursor-pointer hover:text-brand-gold">{t("terms")}</Link>
+          <Link href="/cookies" className="cursor-pointer hover:text-brand-gold">{t("cookies")}</Link>
+          <Link href="/accessibility" className="cursor-pointer hover:text-brand-gold">{t("accessibility")}</Link>
         </FooterColumn>
         <FooterColumn title={t("contactInfo")}>
           <ContactLine label={t("address")} value={details.address} />
@@ -46,12 +47,6 @@ export async function SiteFooter({ locale }: { locale: AppLocale }) {
       <div className="border-t border-white/15">
         <Container className="flex flex-col gap-4 py-5 text-sm text-white/75 md:flex-row md:items-center md:justify-between">
           <p>{t("rights", { year: site.copyrightYear })}</p>
-          {site.privacyHref || site.termsHref ? (
-            <div className="flex flex-wrap gap-4">
-              {site.privacyHref ? <ExternalLink href={site.privacyHref}>{t("privacy")}</ExternalLink> : null}
-              {site.termsHref ? <ExternalLink href={site.termsHref}>{t("terms")}</ExternalLink> : null}
-            </div>
-          ) : null}
         </Container>
         <Container className="pb-8">
           <div className="rounded-2xl border border-dashed border-white/25 px-4 py-4">

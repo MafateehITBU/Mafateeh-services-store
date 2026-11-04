@@ -1,3 +1,4 @@
+import { WishlistButton } from "@/components/storefront/wishlist-button";
 import { StoredImage } from "@/components/ui/stored-image";
 import { Link } from "@/i18n/navigation";
 import { getTranslations } from "next-intl/server";
@@ -19,7 +20,8 @@ export async function ServiceCard({ service }: { service: ServiceCardData }) {
   const reviews = service.reviewCount ?? 0;
 
   return (
-    <article className="overflow-hidden rounded-2xl border border-line bg-white shadow-[var(--shadow-soft)] transition duration-300 hover:-translate-y-0.5 hover:shadow-[var(--shadow-panel)]">
+    <article className="relative overflow-hidden rounded-2xl border border-line bg-white shadow-[var(--shadow-soft)] transition duration-300 hover:-translate-y-0.5 hover:shadow-[var(--shadow-panel)]">
+      <WishlistButton serviceId={service.id} />
       <Link href={`/services/${service.slug}`} className="block cursor-pointer">
         <StoredImage src={service.coverImageUrl} alt={service.name} className="aspect-[4/3] w-full" />
         <div className="space-y-2 p-4">

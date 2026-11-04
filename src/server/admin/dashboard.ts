@@ -28,7 +28,6 @@ export async function getDashboardOverview() {
     recentOrders,
     recentCustomers,
     serviceSales,
-    recentActivity,
   ] = await Promise.all([
     prisma.service.count(),
     prisma.service.count({ where: { isActive: true, publishedAt: { not: null } } }),
@@ -70,17 +69,6 @@ export async function getDashboardOverview() {
       by: ["serviceId", "currency"],
       where: { serviceId: { not: null }, order: paidRevenueWhere },
       _sum: { quantity: true, lineTotal: true },
-    }),
-    prisma.adminAuditLog.findMany({
-      orderBy: { createdAt: "desc" },
-      take: 8,
-      select: {
-        id: true,
-        action: true,
-        entityType: true,
-        createdAt: true,
-        actor: { select: { email: true } },
-      },
     }),
   ]);
 
@@ -144,13 +132,6 @@ export async function getDashboardOverview() {
       currency: row.currency,
       quantity: row._sum.quantity ?? 0,
       total: amount(row._sum.lineTotal),
-    })),
-    recentActivity: recentActivity.map((entry) => ({
-      id: entry.id,
-      action: entry.action,
-      entityType: entry.entityType,
-      actorEmail: entry.actor.email,
-      createdAt: entry.createdAt.toISOString(),
     })),
   };
 }

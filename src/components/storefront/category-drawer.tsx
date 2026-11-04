@@ -1,12 +1,14 @@
 "use client";
 
+import { LanguageSwitcher } from "@/components/layout/language-switcher";
 import { EmptyState } from "@/components/ui/empty-state";
 import { IconButton } from "@/components/ui/icon-button";
 import { Overlay } from "@/components/ui/overlay";
 import { StoredImage } from "@/components/ui/stored-image";
 import type { PublicCategory } from "@/features/categories/types";
 import { Link } from "@/i18n/navigation";
-import { LayoutGrid, X } from "lucide-react";
+import { LayoutGrid, ShoppingCart, X } from "lucide-react";
+import { Suspense } from "react";
 import { useTranslations } from "next-intl";
 
 type CategoryDrawerProps = {
@@ -14,9 +16,10 @@ type CategoryDrawerProps = {
   onClose: () => void;
   categories: PublicCategory[];
   unavailable: boolean;
+  cartCount: number;
 };
 
-export function CategoryDrawer({ open, onClose, categories, unavailable }: CategoryDrawerProps) {
+export function CategoryDrawer({ open, onClose, categories, unavailable, cartCount }: CategoryDrawerProps) {
   const t = useTranslations("Menu");
 
   return (
@@ -29,6 +32,24 @@ export function CategoryDrawer({ open, onClose, categories, unavailable }: Categ
           <IconButton label={t("close")} onClick={onClose} className="text-ink hover:bg-canvas-muted">
             <X aria-hidden="true" className="size-5" />
           </IconButton>
+        </div>
+        <div className="flex items-center justify-between gap-3 border-b border-line px-5 py-4 md:hidden">
+          <Link
+            href="/cart"
+            onClick={onClose}
+            className="inline-flex min-h-11 cursor-pointer items-center gap-2 rounded-full px-1 text-sm font-semibold text-ink"
+          >
+            <ShoppingCart aria-hidden="true" className="size-5 text-[#157037]" />
+            {t("cart")}
+            {cartCount > 0 ? (
+              <span className="inline-flex min-w-5 items-center justify-center rounded-full bg-[#dfb026] px-1.5 text-xs font-bold text-[#0c3d1e]">
+                {cartCount > 99 ? "99+" : cartCount}
+              </span>
+            ) : null}
+          </Link>
+          <Suspense fallback={<span className="inline-flex h-10 w-[4.5rem]" />}>
+            <LanguageSwitcher tone="panel" />
+          </Suspense>
         </div>
         <div className="flex-1 overflow-y-auto">
           <nav className="px-3 py-2" aria-label={t("title")}>

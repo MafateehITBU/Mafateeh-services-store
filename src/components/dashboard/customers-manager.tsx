@@ -4,7 +4,6 @@ import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { DataTable } from "@/components/dashboard/data-table";
-import { EmptyState } from "@/components/dashboard/empty-state";
 import { LoadingState } from "@/components/dashboard/loading-state";
 import { StatusBadge, statusLabel, statusTone } from "@/components/dashboard/status-badge";
 
@@ -83,45 +82,42 @@ export function CustomersManager() {
       </form>
       {error ? <p className="rounded-xl bg-danger/10 px-4 py-3 text-sm text-danger">{error}</p> : null}
       {loading ? <LoadingState /> : null}
-      {!loading && data && data.customers.length === 0 ? (
-        <EmptyState title="No customers" body="Customer accounts will appear here after they register." />
-      ) : null}
-      {!loading && data && data.customers.length > 0 ? (
-        <DataTable
-          tableClassName="min-w-[52rem]"
-          columns={[
-            { key: "name", header: "Customer", cell: (row) => row.name },
-            { key: "email", header: "Email", cell: (row) => row.email },
-            { key: "phone", header: "Phone", cell: (row) => row.phone || "—" },
-            {
-              key: "status",
-              header: "Status",
-              cell: (row) => <StatusBadge tone={statusTone(row.status)}>{statusLabel(row.status)}</StatusBadge>,
-            },
-            { key: "created", header: "Registered", cell: (row) => row.createdAt.slice(0, 10) },
-            {
-              key: "actions",
-              header: "Actions",
-              cell: (row) => (
-                <Link href={`/admin/users/${row.id}`} className="inline-flex min-h-9 cursor-pointer items-center rounded-full border border-line px-4 text-sm font-semibold">
-                  View
-                </Link>
-              ),
-            },
-          ]}
-          rows={data.customers}
-          emptyTitle="No customers"
-          emptyBody="Customer accounts will appear here after they register."
-        />
-      ) : null}
-      {data && data.pageCount > 1 ? (
-        <div className="flex items-center justify-between">
-          <p className="text-sm text-muted">{data.total} customers · page {data.page} of {data.pageCount}</p>
-          <div className="flex gap-2">
-            <Button variant="secondary" disabled={page <= 1} onClick={() => setPage((value) => value - 1)}>Previous</Button>
-            <Button variant="secondary" disabled={page >= data.pageCount} onClick={() => setPage((value) => value + 1)}>Next</Button>
+      {!loading && data ? (
+        <article className="rounded-2xl border border-line bg-white p-4 shadow-[var(--shadow-soft)]">
+          <DataTable
+            tableClassName="min-w-[52rem]"
+            columns={[
+              { key: "name", header: "Customer", cell: (row) => row.name },
+              { key: "email", header: "Email", cell: (row) => row.email },
+              { key: "phone", header: "Phone", cell: (row) => row.phone || "—" },
+              {
+                key: "status",
+                header: "Status",
+                cell: (row) => <StatusBadge tone={statusTone(row.status)}>{statusLabel(row.status)}</StatusBadge>,
+              },
+              { key: "created", header: "Registered", cell: (row) => row.createdAt.slice(0, 10) },
+              {
+                key: "actions",
+                header: "Actions",
+                cell: (row) => (
+                  <Link href={`/admin/users/${row.id}`} className="inline-flex min-h-9 cursor-pointer items-center rounded-full border border-line px-4 text-sm font-semibold">
+                    View
+                  </Link>
+                ),
+              },
+            ]}
+            rows={data.customers}
+            emptyTitle="No customers"
+            emptyBody="Customer accounts will appear here after they register."
+          />
+          <div className="mt-4 flex items-center justify-between gap-3">
+            <p className="text-sm text-muted">{data.total} customers · page {data.page} of {data.pageCount}</p>
+            <div className="flex gap-2">
+              <Button variant="secondary" disabled={page <= 1} onClick={() => setPage((value) => value - 1)}>Previous</Button>
+              <Button variant="secondary" disabled={page >= data.pageCount} onClick={() => setPage((value) => value + 1)}>Next</Button>
+            </div>
           </div>
-        </div>
+        </article>
       ) : null}
     </div>
   );
