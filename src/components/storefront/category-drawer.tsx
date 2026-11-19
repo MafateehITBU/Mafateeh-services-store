@@ -5,6 +5,7 @@ import { EmptyState } from "@/components/ui/empty-state";
 import { IconButton } from "@/components/ui/icon-button";
 import { Overlay } from "@/components/ui/overlay";
 import { StoredImage } from "@/components/ui/stored-image";
+import { isDisplayableImage } from "@/lib/display-image";
 import type { PublicCategory } from "@/features/categories/types";
 import { Link } from "@/i18n/navigation";
 import { LayoutGrid, ShoppingCart, X } from "lucide-react";
@@ -81,7 +82,7 @@ export function CategoryDrawer({ open, onClose, categories, unavailable, cartCou
 }
 
 function CategoryThumb({ src, alt }: { src: string | null; alt: string }) {
-  if (!src?.startsWith("data:image/")) {
+  if (!isDisplayableImage(src)) {
     return (
       <span className="inline-flex size-14 shrink-0 items-center justify-center rounded-xl bg-canvas-muted text-brand">
         <LayoutGrid aria-hidden="true" className="size-6" />
