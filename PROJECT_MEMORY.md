@@ -1404,6 +1404,11 @@ Sign-in and email-change codes are 6 digits. A wrong attempt is recorded with a 
 - `src/app/[locale]/account/orders/page.tsx`
 - `PROJECT_MEMORY.md`
 
+## 41. Request limits, origin checks, and security headers
+
+Request limits use a fixed window stored in `RateLimitWindow`, so they survive a restart. The in-memory store remains available for tests. `TRUSTED_PROXY_HEADER` is empty by default, and forwarded addresses are ignored until it is set. Administrator sign-in is limited by IP and email together, waits longer after each attempt, and still runs a password hash when the account does not exist. Every POST, PUT, PATCH, and DELETE under `src/app/api` checks the request origin. JSON and catalog bodies are capped: 16 KB for auth, 64 KB for ordinary admin forms, 12 MB for image forms, and 60 MB for catalog import. Responses send a content security policy, HSTS, nosniff, a strict referrer policy, a permissions policy, and `frame-ancestors 'none'`. The `X-Powered-By` header is off.
+
+
 
 
 

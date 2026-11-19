@@ -47,6 +47,8 @@ Copy-Item .env.example .env
 
 The application validates `DATABASE_URL` in `src/lib/env.ts` before the Prisma Client is created. `SESSION_SECRET` must be at least 32 characters and signs the administrator session cookie. SMTP settings are reserved for future customer email codes and are not used by administrator sign-in.
 
+`TRUSTED_PROXY_HEADER` is optional. Leave it empty when the app is reached directly. Set it to the header a trusted proxy uses for the client address, such as `x-forwarded-for`. Until it is set, forwarded addresses are ignored so a caller cannot pick their own rate-limit key.
+
 ## PostgreSQL
 
 Start the local database:

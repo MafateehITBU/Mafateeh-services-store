@@ -17,7 +17,7 @@ const limits = {
 
 export type CustomerLimitScope = keyof typeof limits;
 
-export function customerIpAllowed(request: Request, scope: CustomerLimitScope) {
+export async function customerIpAllowed(request: Request, scope: CustomerLimitScope) {
   return enforceRateLimit(`customer:${scope}:${clientAddress(request)}`, limits[scope], WINDOW_MS);
 }
 

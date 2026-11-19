@@ -4,6 +4,13 @@ import { promisify } from "node:util";
 const scrypt = promisify(scryptCallback);
 const KEY_LENGTH = 64;
 
+let timingHash: Promise<string> | null = null;
+
+export function dummyPasswordHash() {
+  timingHash ??= hashPassword("mafateeh-timing-equalizer");
+  return timingHash;
+}
+
 export async function hashPassword(password: string) {
   const salt = randomBytes(16).toString("hex");
   const hash = (await scrypt(password, salt, KEY_LENGTH)) as Buffer;

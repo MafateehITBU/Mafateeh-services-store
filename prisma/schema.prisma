@@ -602,3 +602,12 @@ model AdminAuditLog {
   @@index([entityType, entityId])
   @@index([createdAt])
 }
+
+/// Fixed-window counters for request limits. The key includes the window, and expiresAt is only for cleanup.
+model RateLimitWindow {
+  id        String   @id
+  count     Int
+  expiresAt DateTime
+
+  @@index([expiresAt])
+}

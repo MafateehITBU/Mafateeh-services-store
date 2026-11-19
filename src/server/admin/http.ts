@@ -1,19 +1,23 @@
 import "server-only";
 
 import { AdminConfigError } from "@/lib/admin-env";
-import { enforceRateLimit } from "@/server/admin/rate-limit";
+import { consumeRateLimit } from "@/server/admin/rate-limit";
 
 const WINDOW_MS = 15 * 60 * 1000;
 
 export function clientAddress(request: Request) {
-  const forwarded = request.headers.get("x-forwarded-for")?.split(",")[0]?.trim();
-  return forwarded || request.headers.get("x-real-ip") || "unknown";
+  const headerName = process.env.TRUSTED_PROXY_HEADER?.trim().toLowerCase();
+
+  if (!headerName) {
+    return "unknown";
+  }
+
+  const forwarded = request.headers.get(headerName)?.split(",")[0]?.trim();
+  return forwarded || "unknown";
 }
 
-export function allowAttempt(scope: string, email: string, address: string, emailLimit: number) {
-  const emailAllowed = enforceRateLimit(`${scope}:email:${email}`, emailLimit, WINDOW_MS);
-  const addressAllowed = enforceRateLimit(`${scope}:ip:${address}`, 30, WINDOW_MS);
-  return emailAllowed && addressAllowed;
+export async function allowAttempt(scope: string, email: string, address: string, limit: number) {
+  return consumeRateLimit(`${scope}:${address}:${email}`, limit, WINDOW_MS);
 }
 
 export function rateLimitedResponse() {

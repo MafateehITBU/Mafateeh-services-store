@@ -1,14 +1,20 @@
+import { JSON_AUTH_BYTES, readJsonCapped } from "@/server/security/read-body";
+import { assertSameOrigin } from "@/server/security/same-origin";
 import { AdminConfigError } from "@/lib/admin-env";
 import { requestCustomerCode } from "@/server/auth/customer-otp";
 import { customerIpAllowed, customerRateLimited } from "@/server/auth/request-limit";
 import { customerEmailSchema } from "@/validations/customer-auth";
 
 export async function POST(request: Request) {
-  if (!customerIpAllowed(request, "auth-email")) {
+  const originBlock = assertSameOrigin(request);
+  if (originBlock) return originBlock;
+  const incoming = await readJsonCapped(request, JSON_AUTH_BYTES);
+  if (incoming instanceof Response) return incoming;
+  if (!(await customerIpAllowed(request, "auth-email"))) {
     return customerRateLimited();
   }
 
-  const parsed = customerEmailSchema.safeParse(await request.json().catch(() => null));
+  const parsed = customerEmailSchema.safeParse(incoming.json);
 
   if (!parsed.success) {
     return Response.json({ error: "invalid_email" }, { status: 400 });

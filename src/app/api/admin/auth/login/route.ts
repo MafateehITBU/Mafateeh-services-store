@@ -1,3 +1,4 @@
+import { dummyPasswordHash, verifyPassword } from "@/server/admin/password";
 import {
   adminFailureResponse,
   allowAttempt,
@@ -7,26 +8,36 @@ import {
 } from "@/server/admin/http";
 import { authenticateAdmin } from "@/server/admin/login";
 import { createAdminSession } from "@/server/admin/session";
+import { assertSameOrigin } from "@/server/security/same-origin";
+import { JSON_AUTH_BYTES, readJsonCapped } from "@/server/security/read-body";
 import { adminLoginSchema } from "@/validations/admin-auth";
 
 export async function POST(request: Request) {
-  let body: unknown;
+  const originBlock = assertSameOrigin(request);
 
-  try {
-    body = await request.json();
-  } catch {
-    return invalidRequestResponse();
+  if (originBlock) {
+    return originBlock;
   }
 
-  const parsed = adminLoginSchema.safeParse(body);
+  const body = await readJsonCapped(request, JSON_AUTH_BYTES);
+
+  if (body instanceof Response) {
+    return body;
+  }
+
+  const parsed = adminLoginSchema.safeParse(body.json);
 
   if (!parsed.success) {
     return invalidRequestResponse();
   }
 
   const email = parsed.data.email.toLowerCase();
+  const attempt = await allowAttempt("admin-password-login", email, clientAddress(request), 10);
+  const delay = Math.min(1600, 50 * 2 ** Math.min(Math.max(attempt.count - 1, 0), 5));
+  await new Promise((resolve) => setTimeout(resolve, delay));
 
-  if (!allowAttempt("admin-password-login", email, clientAddress(request), 10)) {
+  if (!attempt.allowed) {
+    await verifyPassword(parsed.data.password, await dummyPasswordHash());
     return rateLimitedResponse();
   }
 

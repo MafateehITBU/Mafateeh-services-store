@@ -1,3 +1,5 @@
+import { JSON_FORM_BYTES, readJsonCapped } from "@/server/security/read-body";
+import { assertSameOrigin } from "@/server/security/same-origin";
 import { adminAccessResponse, requireAdmin } from "@/server/admin/authorization";
 import { CustomerRuleError, getCustomer, updateCustomerStatus } from "@/server/admin/customers";
 import { customerStatusSchema } from "@/validations/admin-operations";
@@ -31,13 +33,17 @@ export async function GET(_request: Request, context: RouteContext) {
 }
 
 export async function PATCH(request: Request, context: RouteContext) {
+  const originBlock = assertSameOrigin(request);
+  if (originBlock) return originBlock;
+  const incoming = await readJsonCapped(request, JSON_FORM_BYTES);
+  if (incoming instanceof Response) return incoming;
   const access = await requireAdmin();
 
   if (!access.ok) {
     return adminAccessResponse(access);
   }
 
-  const body = await request.json().catch(() => null);
+  const body = incoming.json;
 
   if (body && typeof body === "object" && ("role" in body || "passwordHash" in body)) {
     return Response.json(

@@ -1,13 +1,19 @@
+import { JSON_AUTH_BYTES, readJsonCapped } from "@/server/security/read-body";
+import { assertSameOrigin } from "@/server/security/same-origin";
 import { customerIpAllowed, customerRateLimited } from "@/server/auth/request-limit";
 import { submitServiceReview } from "@/server/storefront/reviews";
 
 export async function POST(request: Request) {
-  if (!customerIpAllowed(request, "reviews")) {
+  const originBlock = assertSameOrigin(request);
+  if (originBlock) return originBlock;
+  const incoming = await readJsonCapped(request, JSON_AUTH_BYTES);
+  if (incoming instanceof Response) return incoming;
+  if (!(await customerIpAllowed(request, "reviews"))) {
     return customerRateLimited();
   }
 
   try {
-    const result = await submitServiceReview(await request.json().catch(() => null));
+    const result = await submitServiceReview(incoming.json);
 
     if (!result.ok) {
       return Response.json({ error: "review_rejected" }, { status: result.status });

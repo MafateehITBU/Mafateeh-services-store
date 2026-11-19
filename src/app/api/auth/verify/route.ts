@@ -1,13 +1,19 @@
+import { JSON_AUTH_BYTES, readJsonCapped } from "@/server/security/read-body";
+import { assertSameOrigin } from "@/server/security/same-origin";
 import { verifyCustomerCode } from "@/server/auth/customer-otp";
 import { customerIpAllowed, customerRateLimited } from "@/server/auth/request-limit";
 import { customerCodeSchema } from "@/validations/customer-auth";
 
 export async function POST(request: Request) {
-  if (!customerIpAllowed(request, "auth-verify")) {
+  const originBlock = assertSameOrigin(request);
+  if (originBlock) return originBlock;
+  const incoming = await readJsonCapped(request, JSON_AUTH_BYTES);
+  if (incoming instanceof Response) return incoming;
+  if (!(await customerIpAllowed(request, "auth-verify"))) {
     return customerRateLimited();
   }
 
-  const parsed = customerCodeSchema.safeParse(await request.json().catch(() => null));
+  const parsed = customerCodeSchema.safeParse(incoming.json);
 
   if (!parsed.success) {
     return Response.json({ error: "invalid_code" }, { status: 400 });

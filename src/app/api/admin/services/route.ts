@@ -1,3 +1,5 @@
+import { JSON_IMAGE_BYTES, readJsonCapped } from "@/server/security/read-body";
+import { assertSameOrigin } from "@/server/security/same-origin";
 import { adminAccessResponse, requireAdmin } from "@/server/admin/authorization";
 import { ServiceRuleError, createService, listServices } from "@/server/admin/services";
 import { serviceInputSchema, serviceListSchema } from "@/validations/service";
@@ -37,13 +39,17 @@ export async function GET(request: Request) {
 }
 
 export async function POST(request: Request) {
+  const originBlock = assertSameOrigin(request);
+  if (originBlock) return originBlock;
+  const incoming = await readJsonCapped(request, JSON_IMAGE_BYTES);
+  if (incoming instanceof Response) return incoming;
   const access = await requireAdmin();
 
   if (!access.ok) {
     return adminAccessResponse(access);
   }
 
-  const parsed = serviceInputSchema.safeParse(await request.json().catch(() => null));
+  const parsed = serviceInputSchema.safeParse(incoming.json);
 
   if (!parsed.success) {
     return invalid(parsed.error);

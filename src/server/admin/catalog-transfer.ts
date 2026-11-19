@@ -26,7 +26,7 @@ export type CatalogCounts = {
   layoutItems: number;
 };
 
-const MAX_IMPORT_CHARS = 120_000_000;
+const MAX_IMPORT_CHARS = 60_000_000;
 
 function countsOf(file: Pick<CatalogFile, "categories" | "services" | "banners" | "sections" | "layoutItems">): CatalogCounts {
   return {
@@ -271,7 +271,7 @@ export async function exportCatalog(): Promise<CatalogFile> {
 
 export async function importCatalog(actorId: string, raw: string) {
   if (raw.length > MAX_IMPORT_CHARS) {
-    throw new CatalogTransferError(413, "file_too_large", "That file is too large to import.");
+    throw new CatalogTransferError(413, "file_too_large", "That catalog file is larger than 60 MB.");
   }
 
   let json: unknown;

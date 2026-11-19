@@ -1,14 +1,20 @@
+import { JSON_IMAGE_BYTES, readJsonCapped } from "@/server/security/read-body";
+import { assertSameOrigin } from "@/server/security/same-origin";
 import { requestEmailChange } from "@/server/auth/customer-otp";
 import { customerIpAllowed, customerRateLimited } from "@/server/auth/request-limit";
 import { updateCustomerAccount } from "@/server/storefront/account";
 import { customerAccountSchema, normalizeNationalNumber } from "@/validations/customer-auth";
 
 export async function POST(request: Request) {
-  if (!customerIpAllowed(request, "account")) {
+  const originBlock = assertSameOrigin(request);
+  if (originBlock) return originBlock;
+  const incoming = await readJsonCapped(request, JSON_IMAGE_BYTES);
+  if (incoming instanceof Response) return incoming;
+  if (!(await customerIpAllowed(request, "account"))) {
     return customerRateLimited();
   }
 
-  const parsed = customerAccountSchema.safeParse(await request.json().catch(() => null));
+  const parsed = customerAccountSchema.safeParse(incoming.json);
 
   if (!parsed.success) {
     const invalidPhone = parsed.error.issues.some((issue) => issue.path[0] === "phone");

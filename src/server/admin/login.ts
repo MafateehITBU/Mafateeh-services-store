@@ -1,7 +1,7 @@
 import "server-only";
 
 import { prisma } from "@/lib/prisma";
-import { verifyPassword } from "@/server/admin/password";
+import { dummyPasswordHash, verifyPassword } from "@/server/admin/password";
 
 function isAdministrator(role: string, status: string) {
   return status === "ACTIVE" && (role === "ADMIN" || role === "SUPER_ADMIN");
@@ -21,6 +21,7 @@ export async function authenticateAdmin(email: string, password: string) {
   });
 
   if (!user?.passwordHash || !isAdministrator(user.role, user.status)) {
+    await verifyPassword(password, await dummyPasswordHash());
     return null;
   }
 

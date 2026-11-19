@@ -1,3 +1,5 @@
+import { JSON_IMAGE_BYTES, readJsonCapped } from "@/server/security/read-body";
+import { assertSameOrigin } from "@/server/security/same-origin";
 import { adminAccessResponse, requireAdmin } from "@/server/admin/authorization";
 import { CategoryRuleError, createCategory, listCategories } from "@/server/admin/categories";
 import { categoryInputSchema, categoryListSchema } from "@/validations/category";
@@ -33,13 +35,17 @@ export async function GET(request: Request) {
 }
 
 export async function POST(request: Request) {
+  const originBlock = assertSameOrigin(request);
+  if (originBlock) return originBlock;
+  const incoming = await readJsonCapped(request, JSON_IMAGE_BYTES);
+  if (incoming instanceof Response) return incoming;
   const access = await requireAdmin();
 
   if (!access.ok) {
     return adminAccessResponse(access);
   }
 
-  const parsed = categoryInputSchema.safeParse(await request.json().catch(() => null));
+  const parsed = categoryInputSchema.safeParse(incoming.json);
 
   if (!parsed.success) {
     return Response.json({ error: "invalid_request", message: "Check the category fields and try again." }, { status: 400 });

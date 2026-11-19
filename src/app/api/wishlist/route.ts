@@ -1,9 +1,11 @@
+import { JSON_AUTH_BYTES, readJsonCapped } from "@/server/security/read-body";
+import { assertSameOrigin } from "@/server/security/same-origin";
 import { customerIpAllowed, customerRateLimited } from "@/server/auth/request-limit";
 import { listWishlistIds, toggleWishlist } from "@/server/storefront/account";
 import { z } from "zod";
 
 export async function GET(request: Request) {
-  if (!customerIpAllowed(request, "wishlist")) {
+  if (!(await customerIpAllowed(request, "wishlist"))) {
     return customerRateLimited();
   }
 
@@ -11,11 +13,15 @@ export async function GET(request: Request) {
 }
 
 export async function POST(request: Request) {
-  if (!customerIpAllowed(request, "wishlist")) {
+  const originBlock = assertSameOrigin(request);
+  if (originBlock) return originBlock;
+  const incoming = await readJsonCapped(request, JSON_AUTH_BYTES);
+  if (incoming instanceof Response) return incoming;
+  if (!(await customerIpAllowed(request, "wishlist"))) {
     return customerRateLimited();
   }
 
-  const parsed = z.object({ serviceId: z.string().uuid() }).safeParse(await request.json().catch(() => null));
+  const parsed = z.object({ serviceId: z.string().uuid() }).safeParse(incoming.json);
 
   if (!parsed.success) {
     return Response.json({ error: "invalid" }, { status: 400 });
