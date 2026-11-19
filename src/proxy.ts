@@ -2,6 +2,7 @@ import createMiddleware from "next-intl/middleware";
 import { jwtVerify } from "jose";
 import { NextResponse, type NextRequest } from "next/server";
 import { routing } from "./i18n/routing";
+import { historicCategorySlug, historicServiceSlug } from "./server/content/slug-history";
 import { SESSION_ISSUER, derivedSecret } from "./server/security/session-keys";
 
 const handleI18nRouting = createMiddleware(routing);
@@ -36,6 +37,23 @@ export async function proxy(request: NextRequest) {
     }
 
     return NextResponse.next();
+  }
+
+  const historic = pathname.match(/^\/(en|ar)\/(services|categories)\/([^/]+)\/?$/);
+
+  if (historic?.[1] && historic[2] && historic[3]) {
+    try {
+      const slug = decodeURIComponent(historic[3]);
+      const nextSlug = historic[2] === "services" ? await historicServiceSlug(slug) : await historicCategorySlug(slug);
+
+      if (nextSlug) {
+        const url = request.nextUrl.clone();
+        url.pathname = `/${historic[1]}/${historic[2]}/${nextSlug}`;
+        return NextResponse.redirect(url, 301);
+      }
+    } catch {
+      return handleI18nRouting(request);
+    }
   }
 
   return handleI18nRouting(request);

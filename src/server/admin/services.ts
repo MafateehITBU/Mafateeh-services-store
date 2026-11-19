@@ -4,6 +4,7 @@ import { emptyDocument, RichTextError, sanitizeRichText } from "@/features/servi
 import { Locale, Prisma } from "@/generated/prisma/client";
 import { prisma } from "@/lib/prisma";
 import { writeAdminAuditLog } from "@/server/admin/audit";
+import { rememberServiceSlug } from "@/server/content/slug-history";
 import { ImageStorageError, imageFromDataUrl, isStoredDataImage, optionalImageFromDataUrl } from "@/server/media/image-storage";
 import type { ServiceInput } from "@/validations/service";
 import { z } from "zod";
@@ -121,8 +122,9 @@ async function allocateSlug(tx: Tx, title: string, serviceId?: string) {
   for (let suffix = 0; suffix < 1000; suffix += 1) {
     const slug = suffix === 0 ? base : `${base}-${suffix + 1}`;
     const existing = await tx.service.findUnique({ where: { slug }, select: { id: true } });
+    const historic = await tx.serviceSlugHistory.findUnique({ where: { slug }, select: { serviceId: true } });
 
-    if (!existing || existing.id === serviceId) {
+    if ((!existing || existing.id === serviceId) && (!historic || historic.serviceId === serviceId)) {
       return slug;
     }
   }
@@ -305,7 +307,7 @@ async function writeService(tx: Tx, serviceId: string | undefined, input: Servic
     throw new ServiceRuleError(400, "category_required", "Choose an active category.");
   }
 
-  const current = serviceId ? await tx.service.findUnique({ where: { id: serviceId }, select: { id: true, categoryId: true, publishedAt: true, isActive: true } }) : null;
+  const current = serviceId ? await tx.service.findUnique({ where: { id: serviceId }, select: { id: true, slug: true, categoryId: true, publishedAt: true, isActive: true } }) : null;
 
   if (serviceId && !current) {
     throw new ServiceRuleError(404, "not_found", "That service was not found.");
@@ -326,6 +328,10 @@ async function writeService(tx: Tx, serviceId: string | undefined, input: Servic
   }
 
   const slug = await allocateSlug(tx, input.en.name, serviceId);
+
+  if (current && current.slug !== slug) {
+    await rememberServiceSlug(tx, current.id, current.slug, slug);
+  }
   const isActive = input.intent === "publish" ? true : input.intent === "draft" ? false : (current?.isActive ?? false);
   const publishedAt = input.intent === "publish" ? (current?.publishedAt ?? new Date()) : input.intent === "draft" ? null : (current?.publishedAt ?? null);
 

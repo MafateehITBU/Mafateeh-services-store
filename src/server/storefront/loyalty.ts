@@ -1,19 +1,10 @@
 import "server-only";
 
-import { Prisma } from "@/generated/prisma/client";
+import type { Prisma } from "@/generated/prisma/client";
 
 type Tx = Prisma.TransactionClient;
 
 export async function creditLoyaltyForOrder(tx: Tx, orderId: string) {
-  const existing = await tx.loyaltyTransaction.findFirst({
-    where: { orderId, type: "EARN" },
-    select: { id: true },
-  });
-
-  if (existing) {
-    return;
-  }
-
   const order = await tx.order.findUnique({
     where: { id: orderId },
     select: {
@@ -30,19 +21,29 @@ export async function creditLoyaltyForOrder(tx: Tx, orderId: string) {
   }
 
   const points = order.items.reduce((sum, item) => sum + item.quantity * (item.service?.loyaltyPoints ?? 0), 0);
+
+  if (points <= 0) {
+    return;
+  }
+
   const wallet = await tx.loyaltyWallet.upsert({
     where: { userId: order.userId },
-    create: { userId: order.userId, pointsBalance: points },
-    update: { pointsBalance: { increment: points } },
+    create: { userId: order.userId, pointsBalance: 0 },
+    update: {},
+    select: { id: true },
   });
+  const inserted = await tx.$executeRaw`
+    INSERT INTO "LoyaltyTransaction" ("id", "walletId", "type", "points", "description", "orderId", "createdAt")
+    VALUES (${crypto.randomUUID()}::uuid, ${wallet.id}::uuid, 'EARN'::"LoyaltyTransactionType", ${points}, ${order.orderNumber}, ${order.id}::uuid, NOW())
+    ON CONFLICT ("orderId") WHERE "type" = 'EARN' AND "orderId" IS NOT NULL DO NOTHING
+  `;
 
-  await tx.loyaltyTransaction.create({
-    data: {
-      walletId: wallet.id,
-      type: "EARN",
-      points,
-      description: order.orderNumber,
-      orderId: order.id,
-    },
+  if (inserted === 0) {
+    return;
+  }
+
+  await tx.loyaltyWallet.update({
+    where: { userId: order.userId },
+    data: { pointsBalance: { increment: points } },
   });
 }

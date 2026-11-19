@@ -3,6 +3,7 @@ import "server-only";
 import { Locale, Prisma } from "@/generated/prisma/client";
 import { prisma } from "@/lib/prisma";
 import { writeAdminAuditLog } from "@/server/admin/audit";
+import { rememberCategorySlug } from "@/server/content/slug-history";
 import { ImageStorageError, imageFromDataUrl, optionalImageFromDataUrl } from "@/server/media/image-storage";
 import type { CategoryInput } from "@/validations/category";
 import { z } from "zod";
@@ -65,8 +66,9 @@ async function allocateSlug(title: string, categoryId?: string) {
   for (let suffix = 0; suffix < 1000; suffix += 1) {
     const slug = suffix === 0 ? base : `${base}-${suffix + 1}`;
     const existing = await prisma.category.findUnique({ where: { slug }, select: { id: true } });
+    const historic = await prisma.categorySlugHistory.findUnique({ where: { slug }, select: { categoryId: true } });
 
-    if (!existing || existing.id === categoryId) {
+    if ((!existing || existing.id === categoryId) && (!historic || historic.categoryId === categoryId)) {
       return slug;
     }
   }
@@ -307,6 +309,11 @@ export async function updateCategory(actorId: string, id: string, input: Categor
   try {
     const category = await prisma.$transaction(async (tx) => {
       await tx.categoryTranslation.deleteMany({ where: { categoryId: id } });
+
+      if (current.slug !== slug) {
+        await rememberCategorySlug(tx, id, current.slug, slug);
+      }
+
       return tx.category.update({
         where: { id },
         data: {

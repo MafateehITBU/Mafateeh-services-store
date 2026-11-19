@@ -1416,6 +1416,11 @@ Request limits use a fixed window stored in `RateLimitWindow`, so they survive a
 
 Uploaded images stay in PostgreSQL. Public list queries return `/media/<kind>/<id>?v=<updatedAt>` and do not select the base64 column. The media route reads one image column, checks the same visibility rules as the public pages, and sends a long-lived cache header. Drafts stay available to a signed-in administrator. Avatars are private unless they appear on an approved public review. A missing mobile banner is resized from the desktop image and cached in memory. New uploads are checked with sharp, re-encoded to WebP, kept as PNG when they need transparency, and limited to 2560 px for banners, 1600 px for covers, and 512 px for avatars. Existing rows are left unchanged until `npx tsx scripts/optimize-images.ts` is run. `--dry-run` prints the size difference first. `listPublicServices` returns at most 48 services. Search and category responses send a short public cache header.
 
+## 44. Database integrity
+
+An earn for an order is unique. A second credit for the same order does nothing, and a zero-point order does not create a transaction. Order status changes only when the stored status is still the one that was read. Review ratings, item quantities, and loyalty balances have database checks. Emails are also unique without regard to case. Old category and service links are kept and answered with a 301 when a slug changes later. Catalog import checks banner links, slug and section-key format, and requires English and Arabic for published or active records. The import audit row is written in that same transaction.
+
+
 
 
 

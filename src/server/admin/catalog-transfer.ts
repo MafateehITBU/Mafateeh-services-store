@@ -4,6 +4,8 @@ import { RichTextError, sanitizeRichText } from "@/features/services/rich-text";
 import { Prisma } from "@/generated/prisma/client";
 import { prisma } from "@/lib/prisma";
 import { writeAdminAuditLog } from "@/server/admin/audit";
+import { rememberCategorySlug, rememberServiceSlug } from "@/server/content/slug-history";
+import { isSafeBannerDestination } from "@/features/homepage/banner-destination";
 import { ImageStorageError, imageFromDataUrl, type ImageProfile } from "@/server/media/image-storage";
 import { catalogFileSchema, type CatalogFile } from "@/validations/catalog-transfer";
 
@@ -27,6 +29,55 @@ export type CatalogCounts = {
 };
 
 const MAX_IMPORT_CHARS = 60_000_000;
+
+const linkPattern = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
+
+function hasBothLanguages(translations: Array<{ locale: string }>) {
+  const locales = new Set(translations.map((item) => item.locale));
+  return locales.has("EN") && locales.has("AR");
+}
+
+function assertCatalogContent(file: CatalogFile) {
+  for (const category of file.categories) {
+    if (!linkPattern.test(category.slug)) {
+      throw new CatalogTransferError(400, "invalid_file", "A category link uses an unsupported format.");
+    }
+
+    if (category.isActive && !hasBothLanguages(category.translations)) {
+      throw new CatalogTransferError(400, "invalid_file", "An active category needs English and Arabic translations.");
+    }
+  }
+
+  for (const service of file.services) {
+    if (!linkPattern.test(service.slug)) {
+      throw new CatalogTransferError(400, "invalid_file", "A service link uses an unsupported format.");
+    }
+
+    if (service.publishedAt && !hasBothLanguages(service.translations)) {
+      throw new CatalogTransferError(400, "invalid_file", "A published service needs English and Arabic translations.");
+    }
+  }
+
+  for (const banner of file.banners) {
+    if (banner.linkUrl && !isSafeBannerDestination(banner.linkUrl)) {
+      throw new CatalogTransferError(400, "invalid_file", "A banner link is not an allowed address.");
+    }
+
+    if (banner.isActive && !hasBothLanguages(banner.translations)) {
+      throw new CatalogTransferError(400, "invalid_file", "An active banner needs English and Arabic translations.");
+    }
+  }
+
+  for (const section of file.sections) {
+    if (!linkPattern.test(section.key)) {
+      throw new CatalogTransferError(400, "invalid_file", "A homepage section key uses an unsupported format.");
+    }
+
+    if (section.isActive && !hasBothLanguages(section.translations)) {
+      throw new CatalogTransferError(400, "invalid_file", "An active homepage section needs English and Arabic translations.");
+    }
+  }
+}
 
 function countsOf(file: Pick<CatalogFile, "categories" | "services" | "banners" | "sections" | "layoutItems">): CatalogCounts {
   return {
@@ -298,6 +349,7 @@ export async function importCatalog(actorId: string, raw: string) {
     file.services.flatMap((service) => service.variants.map((variant) => variant.id)),
     "service packages",
   );
+  assertCatalogContent(file);
 
   const categories = orderedCategories(file.categories);
   const categoryIds = categories.map((item) => item.id);
@@ -346,7 +398,36 @@ export async function importCatalog(actorId: string, raw: string) {
 
         await tx.homepageLayoutItem.deleteMany();
 
+        const [previousCategories, previousServices] = await Promise.all([
+          tx.category.findMany({ where: { id: { in: categoryIds } }, select: { id: true, slug: true } }),
+          tx.service.findMany({ where: { id: { in: serviceIds } }, select: { id: true, slug: true } }),
+        ]);
+        const previousCategorySlug = new Map(previousCategories.map((item) => [item.id, item.slug]));
+        const previousServiceSlug = new Map(previousServices.map((item) => [item.id, item.slug]));
+        const categoryHistory = categoryIds.length
+          ? await tx.categorySlugHistory.findFirst({
+              where: { slug: { in: categories.map((item) => item.slug) }, categoryId: { notIn: categoryIds } },
+              select: { id: true },
+            })
+          : null;
+        const serviceHistory = serviceIds.length
+          ? await tx.serviceSlugHistory.findFirst({
+              where: { slug: { in: file.services.map((item) => item.slug) }, serviceId: { notIn: serviceIds } },
+              select: { id: true },
+            })
+          : null;
+
+        if (categoryHistory || serviceHistory) {
+          throw new CatalogTransferError(409, "already_exists", "A link in the file is already reserved by another category or service.");
+        }
+
         for (const category of categories) {
+          const previousCategory = previousCategorySlug.get(category.id);
+
+          if (previousCategory) {
+            await rememberCategorySlug(tx, category.id, previousCategory, category.slug);
+          }
+
           const data = {
             slug: category.slug,
             iconName: category.iconName,
@@ -410,6 +491,12 @@ export async function importCatalog(actorId: string, raw: string) {
         for (const service of file.services) {
           if (!knownCategoryIds.has(service.categoryId)) {
             throw new CatalogTransferError(400, "invalid_file", "A service points at a category that is not in the file or this database.");
+          }
+
+          const previousService = previousServiceSlug.get(service.id);
+
+          if (previousService) {
+            await rememberServiceSlug(tx, service.id, previousService, service.slug);
           }
 
           const data = {
@@ -622,6 +709,17 @@ export async function importCatalog(actorId: string, raw: string) {
             })),
           });
         }
+        try {
+          await writeAdminAuditLog({
+            actorId,
+            action: "catalog.import",
+            entityType: "Catalog",
+            entityId: actorId,
+            afterData: countsOf(file),
+          }, tx);
+        } catch {
+          console.error("catalog_audit_failed");
+        }
       },
       { timeout: 180_000 },
     );
@@ -641,14 +739,5 @@ export async function importCatalog(actorId: string, raw: string) {
     throw error;
   }
 
-  const counts = countsOf(file);
-  await writeAdminAuditLog({
-    actorId,
-    action: "catalog.import",
-    entityType: "Catalog",
-    entityId: actorId,
-    afterData: counts,
-  });
-
-  return counts;
+  return countsOf(file);
 }

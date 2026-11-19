@@ -30,8 +30,8 @@ function scrub(value: unknown): Prisma.InputJsonValue | undefined {
   ) as Prisma.InputJsonValue;
 }
 
-export async function writeAdminAuditLog(input: AdminAuditInput) {
-  await prisma.adminAuditLog.create({
+export async function writeAdminAuditLog(input: AdminAuditInput, db: Pick<typeof prisma, "adminAuditLog"> = prisma) {
+  await db.adminAuditLog.create({
     data: {
       actorId: input.actorId,
       action: input.action,

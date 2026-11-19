@@ -241,18 +241,22 @@ export async function updateOrderStatus(actorId: string, id: string, status: Ord
   }
 
   const updated = await prisma.$transaction(async (tx) => {
-    const saved = await tx.order.update({
-      where: { id },
+    const changed = await tx.order.updateMany({
+      where: { id, status: current.status },
       data: {
         status,
         completedAt: status === "COMPLETED" ? current.completedAt ?? new Date() : current.completedAt,
       },
-      select: { id: true, status: true, paymentStatus: true, total: true },
     });
 
-    if (saved.paymentStatus !== current.paymentStatus) {
-      throw new OrderRuleError("Payment status cannot change with the order status.");
+    if (changed.count !== 1) {
+      throw new OrderRuleError("That order status change is not allowed.");
     }
+
+    const saved = await tx.order.findUniqueOrThrow({
+      where: { id },
+      select: { id: true, status: true, paymentStatus: true, total: true },
+    });
 
     if ((status === "PAID" || status === "PROCESSING" || status === "COMPLETED") && saved.paymentStatus === "PAID") {
       await creditLoyaltyForOrder(tx, id);
