@@ -34,9 +34,6 @@ yarn-error.log*
 .env*
 !.env.example
 
-# Local development memory for coding agents. Do not commit.
-PROJECT_MEMORY.md
-
 # Generated Prisma Client
 /src/generated/
 
