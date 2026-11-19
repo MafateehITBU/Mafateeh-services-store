@@ -35,6 +35,10 @@ async function hasSignedAdminSession(request: NextRequest) {
 export async function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
+  if (pathname === "/media" || pathname.startsWith("/media/")) {
+    return NextResponse.next();
+  }
+
   if (pathname === "/admin" || pathname.startsWith("/admin/")) {
     if (pathname !== "/admin/login" && !(await hasSignedAdminSession(request))) {
       return NextResponse.redirect(new URL("/admin/login", request.url));
@@ -64,5 +68,5 @@ export async function proxy(request: NextRequest) {
 }
 
 export const config = {
-  matcher: "/((?!api|trpc|_next|_vercel|.*\\..*).*)",
+  matcher: "/((?!api|trpc|media|_next|_vercel|.*\\..*).*)",
 };
