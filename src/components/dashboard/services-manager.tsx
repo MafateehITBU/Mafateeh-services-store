@@ -10,6 +10,7 @@ import { Button } from "@/components/ui/button";
 import { StoredImage } from "@/components/ui/stored-image";
 import { Eye, Pencil, Power, Trash2 } from "lucide-react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useState, type ReactNode } from "react";
 
 type ServiceRow = {
@@ -35,6 +36,20 @@ type ListResponse = {
 };
 
 type CategoryOption = { id: string; title: string };
+
+export function AddServiceButton() {
+  const router = useRouter();
+
+  return (
+    <button
+      type="button"
+      onClick={() => router.push(`/admin/services/new?fresh=${Date.now()}`)}
+      className="inline-flex min-h-11 cursor-pointer items-center rounded-full bg-brand px-5 text-sm font-semibold text-white"
+    >
+      Add service
+    </button>
+  );
+}
 
 export function ServicesManager() {
   const [search, setSearch] = useState("");

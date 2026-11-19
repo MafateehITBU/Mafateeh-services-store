@@ -37,6 +37,14 @@ type ServicePayload = {
 
 const fieldClass = "h-11 w-full rounded-2xl border border-line bg-white px-3 text-sm";
 
+function blankCopy(): Copy {
+  return {
+    name: "",
+    shortDescription: "",
+    detailedDescription: structuredClone(emptyDocument),
+  };
+}
+
 function readImage(file: File, onReady: (value: string) => void, onError: (message: string) => void) {
   if (file.size > 5 * 1024 * 1024) {
     onError("Images must be PNG, JPEG, or WebP files up to 5 MB.");
@@ -76,8 +84,8 @@ export function ServiceEditor({ serviceId, readOnly }: { serviceId?: string; rea
   const [customCurrency, setCustomCurrency] = useState(false);
   const [isFeatured, setIsFeatured] = useState(false);
   const [sortOrder, setSortOrder] = useState("1");
-  const [en, setEn] = useState<Copy>({ name: "", shortDescription: "", detailedDescription: emptyDocument });
-  const [ar, setAr] = useState<Copy>({ name: "", shortDescription: "", detailedDescription: emptyDocument });
+  const [en, setEn] = useState<Copy>(blankCopy);
+  const [ar, setAr] = useState<Copy>(blankCopy);
   const [gallery, setGallery] = useState<GalleryItem[]>([]);
   const [confirmDeactivate, setConfirmDeactivate] = useState(false);
 
@@ -125,6 +133,23 @@ export function ServiceEditor({ serviceId, readOnly }: { serviceId?: string; rea
         setEn(service.en);
         setAr(service.ar);
         setGallery(service.gallery.map((item) => ({ key: crypto.randomUUID(), image: item.imageUrl, altText: item.altText })));
+      } else if (!serviceId) {
+        setStatus("draft");
+        setRatingAverage(null);
+        setReviewCount(0);
+        setCategoryId("");
+        setCover(null);
+        setBasePrice("");
+        setLoyaltyPoints("0");
+        setCurrency("JOD");
+        setCustomCurrency(false);
+        setIsFeatured(false);
+        setSortOrder("1");
+        setEn(blankCopy());
+        setAr(blankCopy());
+        setGallery([]);
+        setPreview(null);
+        setToast(null);
       }
 
       setReady(true);
@@ -198,7 +223,8 @@ export function ServiceEditor({ serviceId, readOnly }: { serviceId?: string; rea
     setToast(intent === "publish" ? "Service published." : "Service saved.");
 
     if (!serviceId) {
-      router.replace(`/admin/services/${payload.id}`);
+      router.replace(`/admin/services?created=${Date.now()}`);
+      router.refresh();
       return;
     }
 
