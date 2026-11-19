@@ -132,7 +132,7 @@ export default async function ServicePage({ params }: PageProps) {
         <ServiceGallery name={service.name} coverImageUrl={service.coverImageUrl} gallery={service.gallery} />
         <div>
           <h1 className="text-3xl font-bold md:text-4xl">{service.name}</h1>
-          <ServiceStars value={starValue} label={t("stars", { count: Math.round(starValue) })} />
+          <ServiceStars value={starValue} label={service.reviewCount > 0 ? t("stars", { count: Math.round(starValue) }) : ""} />
           <p className="mt-4 text-base leading-7 text-muted">{service.shortDescription}</p>
           <p className="mt-4 text-2xl font-bold text-[#d3122a]">
             {service.price} <span className="text-lg">{service.currency}</span>

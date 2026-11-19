@@ -4,7 +4,7 @@ export function ServiceStars({ value, label, className = "mt-3" }: { value: numb
   const filled = Math.min(5, Math.max(0, Math.round(value)));
 
   return (
-    <p className={`inline-flex items-center gap-1 ${className}`} aria-label={label}>
+    <p className={`inline-flex items-center gap-1 ${className}`} aria-hidden={label ? undefined : true} aria-label={label || undefined}>
       {Array.from({ length: 5 }, (_, index) => {
         const active = index < filled;
 
