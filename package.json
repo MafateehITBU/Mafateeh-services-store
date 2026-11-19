@@ -2,11 +2,17 @@
   "name": "mafateeh-services-store",
   "version": "0.1.0",
   "private": true,
+  "engines": {
+    "node": ">=22.12"
+  },
   "scripts": {
     "dev": "next dev",
     "build": "prisma generate && next build",
     "start": "next start",
     "lint": "eslint",
+    "typecheck": "tsc --noEmit",
+    "test": "node --conditions=react-server --import tsx --import dotenv/config --test \"src/**/*.test.ts\"",
+    "format": "prettier --write .",
     "postinstall": "node scripts/generate-prisma.mjs",
     "db:generate": "prisma generate",
     "db:validate": "prisma validate",
@@ -58,6 +64,7 @@
     "@types/react-dom": "^19",
     "eslint": "^9",
     "eslint-config-next": "16.4.3",
+    "prettier": "3.10.1",
     "prisma": "7.10.1",
     "tailwindcss": "^4",
     "tsx": "4.23.15",

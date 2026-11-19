@@ -11,7 +11,11 @@ async function hasSignedAdminSession(request: NextRequest) {
   const token = request.cookies.get("mafateeh_admin_session")?.value;
   const secret = process.env.SESSION_SECRET?.trim();
 
-  if (!token || !secret || secret.length < 32) {
+  if (!secret || secret.length < 32) {
+    throw new Error("SESSION_SECRET must be at least 32 characters.");
+  }
+
+  if (!token) {
     return false;
   }
 

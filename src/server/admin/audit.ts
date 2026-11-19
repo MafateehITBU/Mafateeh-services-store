@@ -31,14 +31,18 @@ function scrub(value: unknown): Prisma.InputJsonValue | undefined {
 }
 
 export async function writeAdminAuditLog(input: AdminAuditInput, db: Pick<typeof prisma, "adminAuditLog"> = prisma) {
-  await db.adminAuditLog.create({
-    data: {
-      actorId: input.actorId,
-      action: input.action,
-      entityType: input.entityType,
-      entityId: input.entityId,
-      beforeData: scrub(input.beforeData),
-      afterData: scrub(input.afterData),
-    },
-  });
+  try {
+    await db.adminAuditLog.create({
+      data: {
+        actorId: input.actorId,
+        action: input.action,
+        entityType: input.entityType,
+        entityId: input.entityId,
+        beforeData: scrub(input.beforeData),
+        afterData: scrub(input.afterData),
+      },
+    });
+  } catch (error) {
+    console.error(JSON.stringify({ event: "audit_log_failed", name: error instanceof Error ? error.name : "error" }));
+  }
 }

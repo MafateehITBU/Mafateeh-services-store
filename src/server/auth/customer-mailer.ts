@@ -1,6 +1,6 @@
 import "server-only";
 
-import { readAdminDeliveryConfig } from "@/lib/admin-env";
+import { readDeliveryConfig } from "@/lib/admin-env";
 import nodemailer from "nodemailer";
 import path from "node:path";
 
@@ -50,20 +50,35 @@ function emailHtml(code: string, title: string, arabicTitle: string) {
 </html>`;
 }
 
-export async function sendCustomerOtpEmail(to: string, code: string, purpose: "sign-in" | "email-change" = "sign-in") {
-  const config = readAdminDeliveryConfig();
-  const transport = nodemailer.createTransport({
+let transport: ReturnType<typeof nodemailer.createTransport> | null = null;
+
+function mailTransport() {
+  if (transport) {
+    return transport;
+  }
+
+  const config = readDeliveryConfig();
+  transport = nodemailer.createTransport({
+    pool: true,
+    maxConnections: 2,
     host: config.host,
     port: config.port,
     secure: config.port === 465,
+    connectionTimeout: 10_000,
+    socketTimeout: 10_000,
     auth: {
       user: config.user,
       pass: config.password,
     },
   });
+  return transport;
+}
+
+export async function sendCustomerOtpEmail(to: string, code: string, purpose: "sign-in" | "email-change" = "sign-in") {
+  const config = readDeliveryConfig();
   const confirmingEmail = purpose === "email-change";
 
-  await transport.sendMail({
+  await mailTransport().sendMail({
     from: config.from,
     to,
     subject: confirmingEmail ? "Confirm your Mafateeh email" : "Mafateeh sign-in code",

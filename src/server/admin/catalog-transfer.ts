@@ -37,7 +37,7 @@ function hasBothLanguages(translations: Array<{ locale: string }>) {
   return locales.has("EN") && locales.has("AR");
 }
 
-function assertCatalogContent(file: CatalogFile) {
+export function assertCatalogContent(file: CatalogFile) {
   for (const category of file.categories) {
     if (!linkPattern.test(category.slug)) {
       throw new CatalogTransferError(400, "invalid_file", "A category link uses an unsupported format.");

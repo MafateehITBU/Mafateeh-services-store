@@ -54,7 +54,7 @@ export function readSessionSecret() {
   return parsed.data.SESSION_SECRET;
 }
 
-export function readAdminDeliveryConfig(): AdminDeliveryConfig {
+export function readDeliveryConfig(): AdminDeliveryConfig {
   const parsed = deliverySchema.safeParse({
     SESSION_SECRET: process.env.SESSION_SECRET,
     SMTP_HOST: process.env.SMTP_HOST,
@@ -68,8 +68,8 @@ export function readAdminDeliveryConfig(): AdminDeliveryConfig {
     const names = missingNames(parsed.error.issues);
     throw new AdminConfigError(
       names.length > 0
-        ? `Admin email delivery is not configured. Set ${names.join(", ")}.`
-        : "Admin email delivery is not configured.",
+        ? `Email delivery is not configured. Set ${names.join(", ")}.`
+        : "Email delivery is not configured.",
     );
   }
 
