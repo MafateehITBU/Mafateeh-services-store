@@ -58,6 +58,12 @@ function mailTransport() {
   }
 
   const config = readDeliveryConfig();
+
+  if (process.env.MAIL_JSON === "1") {
+    transport = nodemailer.createTransport({ jsonTransport: true });
+    return transport;
+  }
+
   transport = nodemailer.createTransport({
     pool: true,
     maxConnections: 2,

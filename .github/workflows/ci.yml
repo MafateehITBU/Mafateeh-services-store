@@ -30,6 +30,7 @@ jobs:
       SMTP_USER: ci
       SMTP_PASS: ci
       SMTP_FROM: ci@example.com
+      MAIL_JSON: "1"
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
