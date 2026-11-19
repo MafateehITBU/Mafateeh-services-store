@@ -174,7 +174,7 @@ export function CategoryCarousel({ categories }: { categories: CategoryCard[] })
               <div key={category.id} data-card className="flex w-[100cqw] shrink-0 md:w-[calc((100cqw-1.5rem)/2)] xl:w-[calc((100cqw-3rem)/3)]">
                 <Link href={`/categories/${category.slug}`} className="flex h-full w-full cursor-pointer flex-col overflow-hidden rounded-3xl border border-brand/20 bg-white shadow-[0_12px_22px_-8px_rgba(12,61,30,0.28)] transition duration-300 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand">
                   {category.imageUrl ? (
-                    <FramedArtwork src={category.imageUrl} alt="" className="h-60 w-full" />
+                    <FramedArtwork src={category.imageUrl} alt={category.title} className="h-60 w-full" />
                   ) : (
                     <span className="flex h-60 items-center justify-center bg-transparent text-brand">
                       <LayoutGrid aria-hidden="true" className="size-8" />

@@ -1,9 +1,12 @@
+import { JsonLd } from "@/components/seo/json-ld";
 import { CategoryBanner } from "@/components/storefront/category-banner";
 import { CategoryPagination } from "@/components/storefront/category-pagination";
 import { CategoryServiceCard } from "@/components/storefront/category-service-card";
 import { CategoryToolbar } from "@/components/storefront/category-toolbar";
 import { getPublicCategory } from "@/features/categories/get-public-categories";
 import { listCategoryServices, parseCategoryPage, parseCategorySort } from "@/features/services/get-public-services";
+import { site } from "@/config/site";
+import { absoluteUrl } from "@/lib/env";
 import { Link } from "@/i18n/navigation";
 import { routing, type AppLocale } from "@/i18n/routing";
 import { ChevronRight } from "lucide-react";
@@ -37,16 +40,34 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
     return {};
   }
 
+  const title = category.seoTitle || category.title;
+  const description = category.seoDescription || category.description || undefined;
+
   return {
-    title: category.seoTitle || category.title,
-    description: category.seoDescription || category.description || undefined,
+    title,
+    description,
     alternates: {
-      canonical: `/${locale}/categories/${category.slug}`,
+      canonical: absoluteUrl(`/${locale}/categories/${category.slug}`),
       languages: {
-        en: `/en/categories/${category.slug}`,
-        ar: `/ar/categories/${category.slug}`,
-        "x-default": `/en/categories/${category.slug}`,
+        en: absoluteUrl(`/en/categories/${category.slug}`),
+        ar: absoluteUrl(`/ar/categories/${category.slug}`),
+        "x-default": absoluteUrl(`/en/categories/${category.slug}`),
       },
+    },
+    openGraph: {
+      title,
+      description,
+      url: absoluteUrl(`/${locale}/categories/${category.slug}`),
+      siteName: site.name,
+      locale: locale === "ar" ? "ar_JO" : "en_US",
+      type: "website",
+      images: category.bannerImageUrl ? [{ url: absoluteUrl(category.bannerImageUrl) }] : undefined,
+    },
+    twitter: {
+      card: category.bannerImageUrl ? "summary_large_image" : "summary",
+      title,
+      description,
+      images: category.bannerImageUrl ? [absoluteUrl(category.bannerImageUrl)] : undefined,
     },
   };
 }
@@ -77,6 +98,16 @@ export default async function CategoryPage({ params, searchParams }: PageProps) 
 
   return (
     <article className="mx-auto max-w-[var(--container)] px-4 py-6 md:px-6 md:py-8">
+      <JsonLd
+        data={{
+          "@context": "https://schema.org",
+          "@type": "BreadcrumbList",
+          itemListElement: [
+            { "@type": "ListItem", position: 1, name: t("home"), item: absoluteUrl(`/${language}`) },
+            { "@type": "ListItem", position: 2, name: category.title, item: absoluteUrl(`/${language}/categories/${category.slug}`) },
+          ],
+        }}
+      />
       <nav aria-label={t("breadcrumbs")} className="mb-4 flex items-center gap-2 text-sm text-[#5d6b62]">
         <Link href="/" className="cursor-pointer font-semibold hover:text-brand">{t("home")}</Link>
         <ChevronRight aria-hidden="true" className="size-3.5 rtl:rotate-180" />

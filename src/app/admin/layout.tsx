@@ -1,9 +1,11 @@
 import { storefrontFonts } from "@/app/fonts";
+import { env } from "@/lib/env";
 import type { Metadata } from "next";
 import type { ReactNode } from "react";
 import "../globals.css";
 
 export const metadata: Metadata = {
+  metadataBase: new URL(env.SITE_URL),
   title: {
     default: "Mafateeh Admin",
     template: "%s · Mafateeh Admin",

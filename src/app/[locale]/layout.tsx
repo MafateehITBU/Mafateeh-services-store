@@ -4,6 +4,7 @@ import { routing, type AppLocale } from "@/i18n/routing";
 import { hasLocale, NextIntlClientProvider } from "next-intl";
 import { getTranslations, setRequestLocale } from "next-intl/server";
 import { notFound } from "next/navigation";
+import { env } from "@/lib/env";
 import type { Metadata } from "next";
 import type { ReactNode } from "react";
 import "../globals.css";
@@ -33,6 +34,7 @@ export async function generateMetadata({
   const t = await getTranslations({ locale, namespace: "Metadata" });
 
   return {
+    metadataBase: new URL(env.SITE_URL),
     title: {
       default: t("title"),
       template: `%s · ${t("title")}`,

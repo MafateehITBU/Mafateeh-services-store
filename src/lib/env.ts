@@ -14,6 +14,7 @@ const serverEnvSchema = z.object({
         value.startsWith("postgresql://") || value.startsWith("postgres://"),
       "DATABASE_URL must start with postgresql:// or postgres://",
     ),
+  SITE_URL: z.string().url(),
 });
 
 export type ServerEnv = z.infer<typeof serverEnvSchema>;
@@ -22,6 +23,7 @@ function readServerEnv(): ServerEnv {
   const parsed = serverEnvSchema.safeParse({
     NODE_ENV: process.env.NODE_ENV,
     DATABASE_URL: process.env.DATABASE_URL,
+    SITE_URL: process.env.SITE_URL,
   });
 
   if (!parsed.success) {
@@ -36,6 +38,10 @@ function readServerEnv(): ServerEnv {
   }
 
   return parsed.data;
+}
+
+export function absoluteUrl(path: string) {
+  return new URL(path, env.SITE_URL).toString();
 }
 
 export const env = readServerEnv();

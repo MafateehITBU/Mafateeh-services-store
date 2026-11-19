@@ -16,8 +16,8 @@ export function PromoFeature({ banner, imageFirst }: { banner: Promo; imageFirst
   const href = bannerDestinationHref(banner.linkUrl);
   const image = (
     <figure className={imageFirst ? "md:order-1" : "md:order-2"}>
-      <StoredImage src={banner.desktopImageUrl} alt="" fit="contain" className="hidden w-full md:block" />
-      <StoredImage src={banner.mobileImageUrl || banner.desktopImageUrl} alt="" fit="contain" className="w-full md:hidden" />
+      <StoredImage src={banner.desktopImageUrl} alt={banner.title} fit="contain" className="hidden w-full md:block" />
+      <StoredImage src={banner.mobileImageUrl || banner.desktopImageUrl} alt={banner.title} fit="contain" className="w-full md:hidden" />
     </figure>
   );
   const copy = (

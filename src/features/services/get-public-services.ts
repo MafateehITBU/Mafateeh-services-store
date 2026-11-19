@@ -2,8 +2,10 @@ import "server-only";
 
 import { emptyDocument, sanitizeRichText } from "@/features/services/rich-text";
 import { Locale } from "@/generated/prisma/client";
+import { localizedAlt } from "@/lib/display-image";
 import { prisma } from "@/lib/prisma";
 import { idsWithStoredImage, mediaPath } from "@/server/media/media-url";
+import { cache } from "react";
 
 const localeMap = { en: Locale.EN, ar: Locale.AR } as const;
 
@@ -300,7 +302,7 @@ export async function searchPublicServices(locale: PublicLocale, query: string) 
   });
 }
 
-export async function getPublicService(slug: string, locale: PublicLocale) {
+export const getPublicService = cache(async function getPublicService(slug: string, locale: PublicLocale) {
   const language = localeMap[locale];
   const service = await prisma.service.findFirst({
     where: { slug, ...publishedWhere, coverImageUrl: { startsWith: "data:image/" } },
@@ -379,7 +381,7 @@ export async function getPublicService(slug: string, locale: PublicLocale) {
     coverImageUrl: mediaPath("service-cover", service.id, service.updatedAt),
     gallery: service.images.map((image) => ({
       id: image.id,
-      altText: image.altText,
+      altText: localizedAlt(image.altText, translation.name, locale),
       imageUrl: mediaPath("service-image", image.id, service.updatedAt),
     })),
     price: formatAmount(service.basePrice.toString(), locale),
@@ -419,4 +421,4 @@ export async function getPublicService(slug: string, locale: PublicLocale) {
       ];
     }),
   };
-}
+});

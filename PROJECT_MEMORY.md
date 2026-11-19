@@ -1420,6 +1420,11 @@ Uploaded images stay in PostgreSQL. Public list queries return `/media/<kind>/<i
 
 An earn for an order is unique. A second credit for the same order does nothing, and a zero-point order does not create a transaction. Order status changes only when the stored status is still the one that was read. Review ratings, item quantities, and loyalty balances have database checks. Emails are also unique without regard to case. Old category and service links are kept and answered with a 301 when a slug changes later. Catalog import checks banner links, slug and section-key format, and requires English and Arabic for published or active records. The import audit row is written in that same transaction.
 
+## 45. Search metadata
+
+`SITE_URL` is required. Canonical and language links are absolute. The sitemap lists active categories and published services in English and Arabic. Robots excludes `/admin` and `/api`. Home, category, and service pages send Open Graph and Twitter cards that use the media image address. Structured data includes the organization, breadcrumbs, and a service rating only when approved reviews exist. A service page loads its record once for both the metadata and the page. Empty image text, or text in the other language, uses the localized name.
+
+
 
 
 

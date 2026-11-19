@@ -1,3 +1,4 @@
+import { JsonLd } from "@/components/seo/json-ld";
 import { CategoryServiceCard } from "@/components/storefront/category-service-card";
 import { ReviewForm } from "@/components/storefront/review-form";
 import { ReviewSummary } from "@/components/storefront/review-summary";
@@ -8,6 +9,8 @@ import { StoredImage } from "@/components/ui/stored-image";
 import { RichTextView } from "@/features/services/rich-text-view";
 import { getPublicService } from "@/features/services/get-public-services";
 import { Link } from "@/i18n/navigation";
+import { absoluteUrl } from "@/lib/env";
+import { site } from "@/config/site";
 import { routing, type AppLocale } from "@/i18n/routing";
 import { readSignedInUser } from "@/server/auth/storefront-user";
 import { hasUserReview } from "@/server/storefront/reviews";
@@ -35,16 +38,34 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
     return {};
   }
 
+  const title = service.seoTitle || service.name;
+  const description = service.seoDescription || service.shortDescription;
+
   return {
-    title: service.seoTitle || service.name,
-    description: service.seoDescription || service.shortDescription,
+    title,
+    description,
     alternates: {
-      canonical: `/${locale}/services/${service.slug}`,
+      canonical: absoluteUrl(`/${locale}/services/${service.slug}`),
       languages: {
-        en: `/en/services/${service.slug}`,
-        ar: `/ar/services/${service.slug}`,
-        "x-default": `/en/services/${service.slug}`,
+        en: absoluteUrl(`/en/services/${service.slug}`),
+        ar: absoluteUrl(`/ar/services/${service.slug}`),
+        "x-default": absoluteUrl(`/en/services/${service.slug}`),
       },
+    },
+    openGraph: {
+      title,
+      description,
+      url: absoluteUrl(`/${locale}/services/${service.slug}`),
+      siteName: site.name,
+      locale: locale === "ar" ? "ar_JO" : "en_US",
+      type: "website",
+      images: [{ url: absoluteUrl(service.coverImageUrl) }],
+    },
+    twitter: {
+      card: "summary_large_image",
+      title,
+      description,
+      images: [absoluteUrl(service.coverImageUrl)],
     },
   };
 }
@@ -76,6 +97,30 @@ export default async function ServicePage({ params }: PageProps) {
 
   return (
     <article className="mx-auto max-w-[var(--container)] px-4 py-8 md:px-6">
+      <JsonLd
+        data={{
+          "@context": "https://schema.org",
+          "@type": "BreadcrumbList",
+          itemListElement: [
+            { "@type": "ListItem", position: 1, name: t("home"), item: absoluteUrl(`/${language}`) },
+            { "@type": "ListItem", position: 2, name: service.category.title, item: absoluteUrl(`/${language}/categories/${service.category.slug}`) },
+            { "@type": "ListItem", position: 3, name: service.name, item: absoluteUrl(`/${language}/services/${service.slug}`) },
+          ],
+        }}
+      />
+      <JsonLd
+        data={{
+          "@context": "https://schema.org",
+          "@type": "Service",
+          name: service.name,
+          description: service.shortDescription,
+          image: absoluteUrl(service.coverImageUrl),
+          provider: { "@type": "Organization", name: site.legalName },
+          ...(service.reviewCount > 0 && service.ratingAverage != null
+            ? { aggregateRating: { "@type": "AggregateRating", ratingValue: service.ratingAverage, reviewCount: service.reviewCount } }
+            : {}),
+        }}
+      />
       <nav aria-label={t("breadcrumbs")} className="text-sm text-muted">
         <Link href="/" className="cursor-pointer font-semibold text-brand">{t("home")}</Link>
         <span aria-hidden="true"> / </span>

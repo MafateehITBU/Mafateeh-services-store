@@ -20,7 +20,7 @@ export function CategoryBanner({
     <section className="overflow-hidden rounded-3xl bg-[#f4f7f5]">
       <div className="relative">
         {hasBanner ? (
-          <StoredImage src={bannerImageUrl} alt="" fit="contain" className="w-full bg-[#f4f7f5]" />
+          <StoredImage src={bannerImageUrl} alt={title} fit="contain" className="w-full bg-[#f4f7f5]" />
         ) : (
           <div className="min-h-40 bg-[#f4f7f5] md:min-h-56" />
         )}
