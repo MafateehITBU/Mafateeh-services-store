@@ -1,12 +1,17 @@
 import { confirmEmailChange, requestEmailChange } from "@/server/auth/customer-otp";
+import { customerIpAllowed, customerRateLimited } from "@/server/auth/request-limit";
 import { z } from "zod";
 
 const emailChangeSchema = z.object({
   email: z.string().trim().email().max(254),
-  code: z.string().regex(/^\d{4}$/).optional(),
+  code: z.string().regex(/^\d{6}$/).optional(),
 });
 
 export async function POST(request: Request) {
+  if (!customerIpAllowed(request, "account-email")) {
+    return customerRateLimited();
+  }
+
   const parsed = emailChangeSchema.safeParse(await request.json().catch(() => null));
 
   if (!parsed.success) {

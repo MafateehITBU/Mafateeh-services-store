@@ -2,7 +2,7 @@
 
 import { PhoneField } from "@/components/storefront/phone-field";
 import { Overlay } from "@/components/ui/overlay";
-import { isValidNationalNumber, normalizeNationalNumber } from "@/validations/customer-auth";
+import { CUSTOMER_OTP_LENGTH, emptyOtpDigits, isValidNationalNumber, normalizeNationalNumber } from "@/validations/customer-auth";
 import { ArrowLeft, UserRound, X } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useTranslations } from "next-intl";
@@ -25,9 +25,9 @@ function clock(seconds: number) {
 export function AccountModal({ open, needsProfile, onClose }: AccountModalProps) {
   const t = useTranslations("Account");
   const router = useRouter();
-  const [step, setStep] = useState<Step>("email");
+  const [step, setStep] = useState<Step>(needsProfile ? "profile" : "email");
   const [email, setEmail] = useState("");
-  const [digits, setDigits] = useState(["", "", "", ""]);
+  const [digits, setDigits] = useState(emptyOtpDigits);
   const [seconds, setSeconds] = useState(0);
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -35,17 +35,17 @@ export function AccountModal({ open, needsProfile, onClose }: AccountModalProps)
   const [lastName, setLastName] = useState("");
   const [countryIso, setCountryIso] = useState("SA");
   const [phone, setPhone] = useState("");
+  const [seenOpen, setSeenOpen] = useState(open);
   const inputs = useRef<Array<HTMLInputElement | null>>([]);
   const checking = useRef(false);
 
-  useEffect(() => {
-    if (!open) {
-      return;
+  if (open !== seenOpen) {
+    setSeenOpen(open);
+    if (open) {
+      setStep(needsProfile ? "profile" : "email");
+      setError(null);
     }
-
-    setStep(needsProfile ? "profile" : "email");
-    setError(null);
-  }, [open, needsProfile]);
+  }
 
   useEffect(() => {
     if (step !== "code" || seconds <= 0) {
@@ -88,14 +88,14 @@ export function AccountModal({ open, needsProfile, onClose }: AccountModalProps)
       return;
     }
 
-    setDigits(["", "", "", ""]);
+    setDigits(emptyOtpDigits());
     setSeconds(payload?.retryAfter ?? 60);
     setStep("code");
     window.setTimeout(() => inputs.current[0]?.focus(), 50);
   }
 
   async function verify(code: string) {
-    if (checking.current || code.length !== 4) {
+    if (checking.current || code.length !== CUSTOMER_OTP_LENGTH) {
       return;
     }
 
@@ -112,7 +112,7 @@ export function AccountModal({ open, needsProfile, onClose }: AccountModalProps)
     setPending(false);
 
     if (!response.ok) {
-      setDigits(["", "", "", ""]);
+      setDigits(emptyOtpDigits());
       setError(t("invalidCode"));
       inputs.current[0]?.focus();
       return;
@@ -133,7 +133,7 @@ export function AccountModal({ open, needsProfile, onClose }: AccountModalProps)
     next[index] = digit;
     setDigits(next);
 
-    if (digit && index < 3) {
+    if (digit && index < CUSTOMER_OTP_LENGTH - 1) {
       inputs.current[index + 1]?.focus();
     }
 
@@ -239,17 +239,17 @@ export function AccountModal({ open, needsProfile, onClose }: AccountModalProps)
                     }
                   }}
                   onPaste={(event) => {
-                    const pasted = event.clipboardData.getData("text").replace(/\D/g, "").slice(0, 4);
+                    const pasted = event.clipboardData.getData("text").replace(/\D/g, "").slice(0, CUSTOMER_OTP_LENGTH);
                     if (pasted.length === 0) {
                       return;
                     }
                     event.preventDefault();
-                    const next = ["", "", "", ""];
+                    const next = emptyOtpDigits();
                     pasted.split("").forEach((item, itemIndex) => {
                       next[itemIndex] = item;
                     });
                     setDigits(next);
-                    if (pasted.length === 4) {
+                    if (pasted.length === CUSTOMER_OTP_LENGTH) {
                       void verify(pasted);
                     } else {
                       inputs.current[pasted.length]?.focus();

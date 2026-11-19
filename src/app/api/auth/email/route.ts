@@ -1,8 +1,13 @@
 import { AdminConfigError } from "@/lib/admin-env";
 import { requestCustomerCode } from "@/server/auth/customer-otp";
+import { customerIpAllowed, customerRateLimited } from "@/server/auth/request-limit";
 import { customerEmailSchema } from "@/validations/customer-auth";
 
 export async function POST(request: Request) {
+  if (!customerIpAllowed(request, "auth-email")) {
+    return customerRateLimited();
+  }
+
   const parsed = customerEmailSchema.safeParse(await request.json().catch(() => null));
 
   if (!parsed.success) {
@@ -11,11 +16,6 @@ export async function POST(request: Request) {
 
   try {
     const result = await requestCustomerCode(parsed.data.email);
-
-    if (!result.ok) {
-      return Response.json({ error: "unavailable" }, { status: result.status });
-    }
-
     return Response.json({ retryAfter: result.retryAfter });
   } catch (error) {
     if (error instanceof AdminConfigError) {

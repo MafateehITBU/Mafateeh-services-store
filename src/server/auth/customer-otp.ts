@@ -1,6 +1,6 @@
 import "server-only";
 
-import { createHmac, randomInt, timingSafeEqual } from "node:crypto";
+import { createHmac, randomBytes, randomInt, timingSafeEqual } from "node:crypto";
 import { OtpPurpose } from "@/generated/prisma/enums";
 import { prisma } from "@/lib/prisma";
 import { readSessionSecret } from "@/lib/admin-env";
@@ -9,15 +9,24 @@ import { sendCustomerOtpEmail } from "@/server/auth/customer-mailer";
 
 const RESEND_MS = 60_000;
 const CODE_TTL_MS = 5 * 60_000;
+const FAILURE_WINDOW_MS = 15 * 60_000;
+const REQUEST_WINDOW_MS = 60 * 60_000;
+const CLEANUP_AGE_MS = 24 * 60 * 60_000;
 const MAX_ATTEMPTS = 5;
+const MAX_REQUESTS_PER_HOUR = 5;
+const CODE_SPACE = 1_000_000;
 
 function hashCode(email: string, code: string) {
   return createHmac("sha256", readSessionSecret()).update(`customer-login:${email}:${code}`).digest("hex");
 }
 
-function codesMatch(email: string, code: string, codeHash: string) {
-  const actual = Buffer.from(hashCode(email, code), "hex");
-  const expected = Buffer.from(codeHash, "hex");
+function hashEmailChange(userId: string, email: string, code: string) {
+  return createHmac("sha256", readSessionSecret()).update(`customer-email-change:${userId}:${email}:${code}`).digest("hex");
+}
+
+function codesMatch(actualHash: string, expectedHash: string) {
+  const actual = Buffer.from(actualHash, "hex");
+  const expected = Buffer.from(expectedHash, "hex");
 
   if (actual.length === 0 || actual.length !== expected.length) {
     return false;
@@ -26,16 +35,60 @@ function codesMatch(email: string, code: string, codeHash: string) {
   return timingSafeEqual(actual, expected);
 }
 
-export async function requestCustomerCode(email: string) {
-  const normalized = email.trim().toLowerCase();
-  const existing = await prisma.user.findUnique({
-    where: { email: normalized },
-    select: { role: true, status: true },
+function sixDigitCode() {
+  return randomInt(0, CODE_SPACE).toString().padStart(6, "0");
+}
+
+function decoyHash(prefix: string) {
+  return createHmac("sha256", readSessionSecret()).update(`${prefix}:${randomBytes(16).toString("hex")}`).digest("hex");
+}
+
+export async function purgeExpiredEmailOtps() {
+  const cutoff = new Date(Date.now() - CLEANUP_AGE_MS);
+
+  await prisma.emailOtp.deleteMany({
+    where: {
+      OR: [
+        { expiresAt: { lt: cutoff } },
+        { consumedAt: { not: null }, createdAt: { lt: cutoff } },
+      ],
+    },
+  });
+}
+
+async function requestCount(email: string) {
+  return prisma.emailOtp.count({
+    where: { email, createdAt: { gt: new Date(Date.now() - REQUEST_WINDOW_MS) } },
+  });
+}
+
+async function failureCount(email: string) {
+  const total = await prisma.emailOtp.aggregate({
+    where: { email, createdAt: { gt: new Date(Date.now() - FAILURE_WINDOW_MS) } },
+    _sum: { failedAttempts: true },
   });
 
-  if (existing && (existing.role !== "CUSTOMER" || existing.status !== "ACTIVE")) {
-    return { ok: false as const, status: 400 };
-  }
+  return total._sum.failedAttempts ?? 0;
+}
+
+async function burnAttempt(id: string) {
+  return prisma.emailOtp.updateMany({
+    where: { id, consumedAt: null, failedAttempts: { lt: MAX_ATTEMPTS } },
+    data: { failedAttempts: { increment: 1 } },
+  });
+}
+
+function cooldown(createdAt: Date, windowMs: number) {
+  return {
+    ok: true as const,
+    retryAfter: Math.max(1, Math.ceil((createdAt.getTime() + windowMs - Date.now()) / 1000)),
+    resent: false,
+  };
+}
+
+export async function requestCustomerCode(email: string) {
+  const normalized = email.trim().toLowerCase();
+  await purgeExpiredEmailOtps();
 
   const recent = await prisma.emailOtp.findFirst({
     where: {
@@ -49,29 +102,42 @@ export async function requestCustomerCode(email: string) {
   });
 
   if (recent) {
-    return {
-      ok: true as const,
-      retryAfter: Math.max(1, Math.ceil((recent.createdAt.getTime() + RESEND_MS - Date.now()) / 1000)),
-      resent: false,
-    };
+    return cooldown(recent.createdAt, RESEND_MS);
   }
 
-  const code = randomInt(0, 10_000).toString().padStart(4, "0");
+  if ((await requestCount(normalized)) >= MAX_REQUESTS_PER_HOUR) {
+    const oldest = await prisma.emailOtp.findFirst({
+      where: { email: normalized, createdAt: { gt: new Date(Date.now() - REQUEST_WINDOW_MS) } },
+      orderBy: { createdAt: "asc" },
+      select: { createdAt: true },
+    });
+
+    return cooldown(oldest?.createdAt ?? new Date(), REQUEST_WINDOW_MS);
+  }
+
+  const existing = await prisma.user.findUnique({
+    where: { email: normalized },
+    select: { role: true, status: true },
+  });
+  const canDeliver = !existing || (existing.role === "CUSTOMER" && existing.status === "ACTIVE");
+  const code = canDeliver ? sixDigitCode() : null;
   const created = await prisma.emailOtp.create({
     data: {
       email: normalized,
-      codeHash: hashCode(normalized, code),
+      codeHash: code ? hashCode(normalized, code) : decoyHash(`customer-login:${normalized}`),
       purpose: OtpPurpose.LOGIN,
       expiresAt: new Date(Date.now() + CODE_TTL_MS),
     },
     select: { id: true },
   });
 
-  try {
-    await sendCustomerOtpEmail(normalized, code);
-  } catch (error) {
-    await prisma.emailOtp.delete({ where: { id: created.id } });
-    throw error;
+  if (code) {
+    try {
+      await sendCustomerOtpEmail(normalized, code);
+    } catch (error) {
+      await prisma.emailOtp.delete({ where: { id: created.id } });
+      throw error;
+    }
   }
 
   await prisma.emailOtp.updateMany({
@@ -84,6 +150,7 @@ export async function requestCustomerCode(email: string) {
 
 export async function verifyCustomerCode(email: string, code: string) {
   const normalized = email.trim().toLowerCase();
+  await purgeExpiredEmailOtps();
   const challenge = await prisma.emailOtp.findFirst({
     where: {
       email: normalized,
@@ -94,14 +161,13 @@ export async function verifyCustomerCode(email: string, code: string) {
     orderBy: { createdAt: "desc" },
   });
 
-  if (!challenge || challenge.failedAttempts >= MAX_ATTEMPTS || !/^\d{4}$/.test(code) || !codesMatch(normalized, code, challenge.codeHash)) {
-    if (challenge && challenge.failedAttempts < MAX_ATTEMPTS) {
-      await prisma.emailOtp.update({
-        where: { id: challenge.id },
-        data: { failedAttempts: { increment: 1 } },
-      });
-    }
+  if (!challenge || (await failureCount(normalized)) >= MAX_ATTEMPTS) {
+    return { ok: false as const, status: 400 };
+  }
 
+  const burned = await burnAttempt(challenge.id);
+
+  if (burned.count !== 1 || !/^\d{6}$/.test(code) || !codesMatch(hashCode(normalized, code), challenge.codeHash)) {
     return { ok: false as const, status: 400 };
   }
 
@@ -172,10 +238,6 @@ export async function saveCustomerProfile(input: { firstName: string; lastName: 
   return { ok: true as const, firstName: input.firstName };
 }
 
-function hashEmailChange(userId: string, email: string, code: string) {
-  return createHmac("sha256", readSessionSecret()).update(`customer-email-change:${userId}:${email}:${code}`).digest("hex");
-}
-
 async function requireActiveCustomer() {
   const userId = await readCustomerSessionUserId();
 
@@ -208,11 +270,7 @@ export async function requestEmailChange(nextEmail: string) {
     return { ok: false as const, status: 400, error: "invalid_profile" };
   }
 
-  const taken = await prisma.user.findUnique({ where: { email }, select: { id: true } });
-
-  if (taken) {
-    return { ok: false as const, status: 409, error: "email_taken" };
-  }
+  await purgeExpiredEmailOtps();
 
   const recent = await prisma.emailOtp.findFirst({
     where: {
@@ -226,29 +284,38 @@ export async function requestEmailChange(nextEmail: string) {
   });
 
   if (recent) {
-    return {
-      ok: true as const,
-      retryAfter: Math.max(1, Math.ceil((recent.createdAt.getTime() + RESEND_MS - Date.now()) / 1000)),
-      resent: false,
-    };
+    return cooldown(recent.createdAt, RESEND_MS);
   }
 
-  const code = randomInt(0, 10_000).toString().padStart(4, "0");
+  if ((await requestCount(email)) >= MAX_REQUESTS_PER_HOUR) {
+    const oldest = await prisma.emailOtp.findFirst({
+      where: { email, createdAt: { gt: new Date(Date.now() - REQUEST_WINDOW_MS) } },
+      orderBy: { createdAt: "asc" },
+      select: { createdAt: true },
+    });
+
+    return cooldown(oldest?.createdAt ?? new Date(), REQUEST_WINDOW_MS);
+  }
+
+  const taken = await prisma.user.findUnique({ where: { email }, select: { id: true } });
+  const code = taken ? null : sixDigitCode();
   const created = await prisma.emailOtp.create({
     data: {
       email,
-      codeHash: hashEmailChange(user.id, email, code),
+      codeHash: code ? hashEmailChange(user.id, email, code) : decoyHash(`customer-email-change:${user.id}:${email}`),
       purpose: OtpPurpose.CHANGE_EMAIL,
       expiresAt: new Date(Date.now() + CODE_TTL_MS),
     },
     select: { id: true },
   });
 
-  try {
-    await sendCustomerOtpEmail(email, code, "email-change");
-  } catch (error) {
-    await prisma.emailOtp.delete({ where: { id: created.id } });
-    throw error;
+  if (code) {
+    try {
+      await sendCustomerOtpEmail(email, code, "email-change");
+    } catch (error) {
+      await prisma.emailOtp.delete({ where: { id: created.id } });
+      throw error;
+    }
   }
 
   await prisma.emailOtp.updateMany({
@@ -267,6 +334,7 @@ export async function confirmEmailChange(nextEmail: string, code: string) {
   }
 
   const email = nextEmail.trim().toLowerCase();
+  await purgeExpiredEmailOtps();
   const challenge = await prisma.emailOtp.findFirst({
     where: {
       email,
@@ -276,18 +344,15 @@ export async function confirmEmailChange(nextEmail: string, code: string) {
     },
     orderBy: { createdAt: "desc" },
   });
-  const expected = Buffer.from(hashEmailChange(user.id, email, code), "hex");
-  const actual = Buffer.from(challenge?.codeHash ?? "", "hex");
-  const matches = challenge && /^\d{4}$/.test(code) && actual.length === expected.length && timingSafeEqual(actual, expected);
 
-  if (!challenge || challenge.failedAttempts >= MAX_ATTEMPTS || !matches) {
-    if (challenge && challenge.failedAttempts < MAX_ATTEMPTS) {
-      await prisma.emailOtp.update({
-        where: { id: challenge.id },
-        data: { failedAttempts: { increment: 1 } },
-      });
-    }
+  if (!challenge || (await failureCount(email)) >= MAX_ATTEMPTS) {
+    return { ok: false as const, status: 400, error: "invalid_code" };
+  }
 
+  const burned = await burnAttempt(challenge.id);
+  const matches = /^\d{6}$/.test(code) && codesMatch(hashEmailChange(user.id, email, code), challenge.codeHash);
+
+  if (burned.count !== 1 || !matches) {
     return { ok: false as const, status: 400, error: "invalid_code" };
   }
 
@@ -303,7 +368,7 @@ export async function confirmEmailChange(nextEmail: string, code: string) {
   const taken = await prisma.user.findUnique({ where: { email }, select: { id: true } });
 
   if (taken && taken.id !== user.id) {
-    return { ok: false as const, status: 409, error: "email_taken" };
+    return { ok: false as const, status: 400, error: "invalid_code" };
   }
 
   await prisma.user.update({

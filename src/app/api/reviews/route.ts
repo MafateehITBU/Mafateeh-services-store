@@ -1,6 +1,11 @@
+import { customerIpAllowed, customerRateLimited } from "@/server/auth/request-limit";
 import { submitServiceReview } from "@/server/storefront/reviews";
 
 export async function POST(request: Request) {
+  if (!customerIpAllowed(request, "reviews")) {
+    return customerRateLimited();
+  }
+
   try {
     const result = await submitServiceReview(await request.json().catch(() => null));
 

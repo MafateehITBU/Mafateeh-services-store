@@ -2,7 +2,7 @@
 
 import { PhoneField } from "@/components/storefront/phone-field";
 import { StoredImage } from "@/components/ui/stored-image";
-import { isValidNationalNumber, normalizeNationalNumber } from "@/validations/customer-auth";
+import { CUSTOMER_OTP_LENGTH, emptyOtpDigits, isValidNationalNumber, normalizeNationalNumber } from "@/validations/customer-auth";
 import { UserRound } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useTranslations } from "next-intl";
@@ -34,7 +34,7 @@ export function AccountForm(initial: AccountFormProps) {
   const [saved, setSaved] = useState(false);
   const [emailConfirmed, setEmailConfirmed] = useState(false);
   const [confirmingEmail, setConfirmingEmail] = useState<string | null>(null);
-  const [digits, setDigits] = useState(["", "", "", ""]);
+  const [digits, setDigits] = useState(emptyOtpDigits);
   const [seconds, setSeconds] = useState(0);
   const inputs = useRef<Array<HTMLInputElement | null>>([]);
   const checking = useRef(false);
@@ -118,7 +118,7 @@ export function AccountForm(initial: AccountFormProps) {
 
     if (body?.emailConfirmation) {
       setConfirmingEmail(email.trim().toLowerCase());
-      setDigits(["", "", "", ""]);
+      setDigits(emptyOtpDigits());
       setSeconds(body.retryAfter ?? 60);
       window.setTimeout(() => inputs.current[0]?.focus(), 0);
       return;
@@ -172,7 +172,7 @@ export function AccountForm(initial: AccountFormProps) {
 
     if (!response.ok) {
       setError(body?.error === "email_taken" ? t("emailTaken") : account("invalidCode"));
-      setDigits(["", "", "", ""]);
+      setDigits(emptyOtpDigits());
       inputs.current[0]?.focus();
       return;
     }
@@ -189,7 +189,7 @@ export function AccountForm(initial: AccountFormProps) {
     next[index] = digit;
     setDigits(next);
 
-    if (digit && index < 3) {
+    if (digit && index < CUSTOMER_OTP_LENGTH - 1) {
       inputs.current[index + 1]?.focus();
     }
 
@@ -273,17 +273,17 @@ export function AccountForm(initial: AccountFormProps) {
                   }
                 }}
                 onPaste={(event) => {
-                  const pasted = event.clipboardData.getData("text").replace(/\D/g, "").slice(0, 4);
+                  const pasted = event.clipboardData.getData("text").replace(/\D/g, "").slice(0, CUSTOMER_OTP_LENGTH);
                   if (pasted.length === 0) {
                     return;
                   }
                   event.preventDefault();
-                  const next = ["", "", "", ""];
+                  const next = emptyOtpDigits();
                   pasted.split("").forEach((item, itemIndex) => {
                     next[itemIndex] = item;
                   });
                   setDigits(next);
-                  if (pasted.length === 4) {
+                  if (pasted.length === CUSTOMER_OTP_LENGTH) {
                     void verifyCode(pasted);
                   } else {
                     inputs.current[pasted.length]?.focus();

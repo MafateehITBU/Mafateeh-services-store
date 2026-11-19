@@ -1,11 +1,20 @@
+import { customerIpAllowed, customerRateLimited } from "@/server/auth/request-limit";
 import { listWishlistIds, toggleWishlist } from "@/server/storefront/account";
 import { z } from "zod";
 
-export async function GET() {
+export async function GET(request: Request) {
+  if (!customerIpAllowed(request, "wishlist")) {
+    return customerRateLimited();
+  }
+
   return Response.json({ ids: await listWishlistIds() });
 }
 
 export async function POST(request: Request) {
+  if (!customerIpAllowed(request, "wishlist")) {
+    return customerRateLimited();
+  }
+
   const parsed = z.object({ serviceId: z.string().uuid() }).safeParse(await request.json().catch(() => null));
 
   if (!parsed.success) {

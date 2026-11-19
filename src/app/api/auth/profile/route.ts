@@ -1,8 +1,13 @@
 import { findCountry } from "@/lib/countries";
 import { saveCustomerProfile } from "@/server/auth/customer-otp";
+import { customerIpAllowed, customerRateLimited } from "@/server/auth/request-limit";
 import { customerProfileSchema, normalizeNationalNumber } from "@/validations/customer-auth";
 
 export async function POST(request: Request) {
+  if (!customerIpAllowed(request, "auth-profile")) {
+    return customerRateLimited();
+  }
+
   const parsed = customerProfileSchema.safeParse(await request.json().catch(() => null));
 
   if (!parsed.success) {

@@ -1338,7 +1338,7 @@ The cart page starts with a breadcrumb. Each saved service is a row with its cov
 
 ## 35. Customer email sign-in
 
-The header account icon opens a centered sign-in modal. The shopper enters an email and receives a 4-digit code. Filling the fourth digit checks the code without a separate button. A returning customer with a completed profile is signed in, and the first name appears beside the icon. A first-time customer then enters a first name, last name, and phone number. There is no newsletter checkbox and no social sign-in.
+The header account icon opens a centered sign-in modal. The shopper enters an email and receives a 6-digit code. Filling the last digit checks the code without a separate button. A returning customer with a completed profile is signed in, and the first name appears beside the icon. A first-time customer then enters a first name, last name, and phone number. There is no newsletter checkbox and no social sign-in.
 
 The sign-in email is an HTML message in the store green and gold, with the white Mafateeh logo embedded. A mobile number is checked against the selected country, including a leading zero. The signed-in account menu lists Profile and Sign out. Profile opens My Account. The code is stored only as an HMAC hash on `EmailOtp`, expires after 5 minutes, and locks after 5 wrong attempts. A new code can be sent after 60 seconds. The customer session cookie is `mafateeh_customer_session` and is separate from the administrator session. Reviews use this customer session.
 
@@ -1378,6 +1378,31 @@ The Reviews, Orders, and Customers lists use the same white card as Categories: 
 ## 39. Store policies and cart icon
 
 The store has its own Privacy Policy, Terms & Conditions, Cookie Policy, and Accessibility pages in English and Arabic. Their links replace the Company column in the footer. The header cart control uses a cart icon. The header icons and profile photo are larger than the earlier 24px icons and 32px photo. The signed-in name beside them is a medium size, larger than the original small label. A downward arrow sits at the bottom of that name, and the photo, name, and arrow open the account menu together. The menu does not repeat the name. On a phone the cart and the language switch live in the side menu. On a phone the hero shows the uploaded banner below the header at its own shape, and the text sits in the open area at the top of that image, above the artwork. The name stays beside the profile photo.
+
+## 40. Customer login hardening
+
+Sign-in and email-change codes are 6 digits. A wrong attempt is recorded with a conditional increment before the code is compared, so parallel guesses cannot all pass a stale attempt count. An email is limited to 5 verification failures in 15 minutes and 5 code requests in an hour. Unknown, administrator, and suspended addresses get the same success response as a customer and no email is sent. A taken address on email change gets that same response, and confirmation of a taken address returns the ordinary invalid-code result. The listed customer routes also have a per-IP limit. Expired or consumed `EmailOtp` rows older than one day are deleted on the next code write, and `npx tsx scripts/cleanup-email-otp.ts` does the same cleanup on demand.
+
+### Files created
+
+- `src/server/auth/request-limit.ts`
+- `scripts/cleanup-email-otp.ts`
+
+### Files modified
+
+- `src/server/auth/customer-otp.ts`
+- `src/validations/customer-auth.ts`
+- `src/app/api/auth/email/route.ts`
+- `src/app/api/auth/verify/route.ts`
+- `src/app/api/auth/profile/route.ts`
+- `src/app/api/account/route.ts`
+- `src/app/api/account/email/route.ts`
+- `src/app/api/reviews/route.ts`
+- `src/app/api/wishlist/route.ts`
+- `src/components/storefront/account-modal.tsx`
+- `src/components/storefront/account-form.tsx`
+- `src/app/[locale]/account/orders/page.tsx`
+- `PROJECT_MEMORY.md`
 
 
 

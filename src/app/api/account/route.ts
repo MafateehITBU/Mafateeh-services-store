@@ -1,8 +1,13 @@
 import { requestEmailChange } from "@/server/auth/customer-otp";
+import { customerIpAllowed, customerRateLimited } from "@/server/auth/request-limit";
 import { updateCustomerAccount } from "@/server/storefront/account";
 import { customerAccountSchema, normalizeNationalNumber } from "@/validations/customer-auth";
 
 export async function POST(request: Request) {
+  if (!customerIpAllowed(request, "account")) {
+    return customerRateLimited();
+  }
+
   const parsed = customerAccountSchema.safeParse(await request.json().catch(() => null));
 
   if (!parsed.success) {

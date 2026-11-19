@@ -13,9 +13,15 @@ export const customerEmailSchema = z.object({
   email: z.string().trim().email().max(254),
 });
 
+export const CUSTOMER_OTP_LENGTH = 6;
+
+export function emptyOtpDigits() {
+  return Array.from({ length: CUSTOMER_OTP_LENGTH }, () => "");
+}
+
 export const customerCodeSchema = z.object({
   email: z.string().trim().email().max(254),
-  code: z.string().regex(/^\d{4}$/),
+  code: z.string().regex(/^\d{6}$/),
 });
 
 function withPhone<T extends { countryIso: string; phone: string }>(value: T, context: z.RefinementCtx) {

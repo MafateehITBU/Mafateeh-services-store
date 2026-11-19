@@ -12,7 +12,7 @@ export const instant = false;
 
 type PageProps = { params: Promise<{ locale: string }> };
 
-const statuses = ["PENDING_PAYMENT", "PAID", "PROCESSING", "COMPLETED", "CANCELLED", "REFUNDED"] as const;
+type OrderStatus = "PENDING_PAYMENT" | "PAID" | "PROCESSING" | "COMPLETED" | "CANCELLED" | "REFUNDED";
 
 export async function generateMetadata({ params }: PageProps): Promise<Metadata> {
   await connection();
@@ -41,7 +41,7 @@ export default async function OrdersPage({ params }: PageProps) {
     redirect({ href: "/", locale });
     return null;
   }
-  const statusLabel: Record<(typeof statuses)[number], string> = {
+  const statusLabel: Record<OrderStatus, string> = {
     PENDING_PAYMENT: t("pendingPayment"),
     PAID: t("paid"),
     PROCESSING: t("processing"),

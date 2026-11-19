@@ -1,7 +1,12 @@
 import { verifyCustomerCode } from "@/server/auth/customer-otp";
+import { customerIpAllowed, customerRateLimited } from "@/server/auth/request-limit";
 import { customerCodeSchema } from "@/validations/customer-auth";
 
 export async function POST(request: Request) {
+  if (!customerIpAllowed(request, "auth-verify")) {
+    return customerRateLimited();
+  }
+
   const parsed = customerCodeSchema.safeParse(await request.json().catch(() => null));
 
   if (!parsed.success) {
