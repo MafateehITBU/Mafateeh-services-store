@@ -1,4 +1,5 @@
 import { StoredImage } from "@/components/ui/stored-image";
+import { isDisplayableImage } from "@/lib/display-image";
 import { bannerDestinationHref } from "@/features/homepage/banner-destination";
 
 type Promo = {
@@ -40,7 +41,7 @@ export function PromoFeature({ banner, imageFirst }: { banner: Promo; imageFirst
 }
 
 export function PromoBanners({ banners }: { banners: Promo[] }) {
-  const visible = banners.filter((banner) => banner.desktopImageUrl.startsWith("data:image/") && banner.title);
+  const visible = banners.filter((banner) => isDisplayableImage(banner.desktopImageUrl) && banner.title);
 
   if (visible.length === 0) {
     return null;

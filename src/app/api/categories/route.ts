@@ -17,6 +17,9 @@ export async function GET(request: Request) {
       categories: result.categories,
       unavailable: result.unavailable,
     },
-    { status },
+    {
+      status,
+      headers: status === 200 ? { "Cache-Control": "public, max-age=60, stale-while-revalidate=300" } : { "Cache-Control": "no-store" },
+    },
   );
 }

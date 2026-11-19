@@ -3,6 +3,7 @@ import "server-only";
 import { Locale } from "@/generated/prisma/enums";
 import type { AppLocale } from "@/i18n/routing";
 import { prisma } from "@/lib/prisma";
+import { idsWithStoredImage, mediaPath } from "@/server/media/media-url";
 import type { PublicCategory, PublicCategoryDetail, PublicCategoryResult } from "./types";
 
 const databaseLocale: Record<AppLocale, Locale> = {
@@ -22,13 +23,14 @@ export async function getPublicCategoryTree(
         parentId: true,
         slug: true,
         iconName: true,
-        iconImageUrl: true,
+        updatedAt: true,
         translations: {
           select: { locale: true, title: true, description: true },
         },
       },
     });
 
+    const icons = await idsWithStoredImage("Category", "iconImageUrl", rows.map((row) => row.id));
     const nodes = new Map<string, PublicCategory>();
 
     for (const row of rows) {
@@ -43,7 +45,7 @@ export async function getPublicCategoryTree(
         slug: row.slug,
         title: translation.title,
         description: translation.description,
-        imageUrl: row.iconImageUrl,
+        imageUrl: icons.has(row.id) ? mediaPath("category-icon", row.id, row.updatedAt) : null,
         iconName: row.iconName,
         children: [],
       });
@@ -66,8 +68,7 @@ export async function getPublicCategory(slug: string, locale: AppLocale): Promis
     select: {
       id: true,
       slug: true,
-      iconImageUrl: true,
-      bannerImageUrl: true,
+      updatedAt: true,
       translations: { select: { locale: true, title: true, description: true, seoTitle: true, seoDescription: true } },
     },
   });
@@ -77,13 +78,18 @@ export async function getPublicCategory(slug: string, locale: AppLocale): Promis
     return null;
   }
 
+  const [icons, banners] = await Promise.all([
+    idsWithStoredImage("Category", "iconImageUrl", [row.id]),
+    idsWithStoredImage("Category", "bannerImageUrl", [row.id]),
+  ]);
+
   return {
     id: row.id,
     slug: row.slug,
     title: translation.title,
     description: translation.description,
-    imageUrl: row.iconImageUrl,
-    bannerImageUrl: row.bannerImageUrl,
+    imageUrl: icons.has(row.id) ? mediaPath("category-icon", row.id, row.updatedAt) : null,
+    bannerImageUrl: banners.has(row.id) ? mediaPath("category-banner", row.id, row.updatedAt) : null,
     seoTitle: translation.seoTitle,
     seoDescription: translation.seoDescription,
   };

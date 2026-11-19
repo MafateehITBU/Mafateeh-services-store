@@ -1,4 +1,5 @@
 import { StoredImage } from "@/components/ui/stored-image";
+import { isDisplayableImage } from "@/lib/display-image";
 
 export function CategoryBanner({
   title,
@@ -13,7 +14,7 @@ export function CategoryBanner({
   locale: "en" | "ar";
   brand: string;
 }) {
-  const hasBanner = Boolean(bannerImageUrl?.startsWith("data:image/"));
+  const hasBanner = isDisplayableImage(bannerImageUrl);
 
   return (
     <section className="overflow-hidden rounded-3xl bg-[#f4f7f5]">

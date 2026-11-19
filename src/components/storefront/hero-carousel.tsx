@@ -40,13 +40,13 @@ export function HeroCarousel({ banners }: { banners: HeroBanner[] }) {
   return (
     <section aria-label={t("heroLabel")} className="relative w-full overflow-hidden bg-[#f7f4ec] md:-mt-[var(--header-height)]">
       <div className="relative aspect-[4/5] w-full md:hidden">
-        <StoredImage src={mobileImage} alt="" className="h-full w-full" />
+        <StoredImage src={mobileImage} alt="" className="h-full w-full" priority width={1080} height={1350} />
         <div className="pointer-events-none absolute inset-x-0 top-0 z-10 px-4 pt-5" dir={locale === "ar" ? "rtl" : "ltr"}>
           <div className="pointer-events-auto">{copy}</div>
         </div>
       </div>
       <div className="relative hidden w-full md:block md:aspect-[2/1]">
-        <StoredImage src={banner.desktopImageUrl} alt="" className="h-full w-full" />
+        <StoredImage src={banner.desktopImageUrl} alt="" className="h-full w-full" priority width={1600} height={800} />
         <div className="pointer-events-none absolute inset-0 z-10 flex items-center pt-[var(--header-height)]" dir="ltr">
           <div className="mx-auto flex w-full max-w-[var(--container)] px-6">
             <div dir={locale === "ar" ? "rtl" : "ltr"} className="pointer-events-auto max-w-[40rem] -translate-y-10 text-start">

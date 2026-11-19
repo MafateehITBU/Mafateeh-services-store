@@ -4,7 +4,7 @@ import { RichTextError, sanitizeRichText } from "@/features/services/rich-text";
 import { Prisma } from "@/generated/prisma/client";
 import { prisma } from "@/lib/prisma";
 import { writeAdminAuditLog } from "@/server/admin/audit";
-import { ImageStorageError, imageFromDataUrl } from "@/server/media/image-storage";
+import { ImageStorageError, imageFromDataUrl, type ImageProfile } from "@/server/media/image-storage";
 import { catalogFileSchema, type CatalogFile } from "@/validations/catalog-transfer";
 
 export class CatalogTransferError extends Error {
@@ -42,9 +42,9 @@ function money(value: Prisma.Decimal | null) {
   return value ? value.toFixed(3) : null;
 }
 
-function storedImage(value: string, label: string) {
+async function storedImage(value: string, label: string, profile: ImageProfile) {
   try {
-    return imageFromDataUrl(value).dataUrl;
+    return (await imageFromDataUrl(value, profile)).dataUrl;
   } catch (error) {
     if (error instanceof ImageStorageError) {
       throw new CatalogTransferError(400, "invalid_image", `${label}: ${error.message}`);
@@ -54,8 +54,8 @@ function storedImage(value: string, label: string) {
   }
 }
 
-function optionalImage(value: string | null, label: string) {
-  return value ? storedImage(value, label) : null;
+async function optionalImage(value: string | null, label: string, profile: ImageProfile) {
+  return value ? storedImage(value, label, profile) : null;
 }
 
 function description(value: unknown) {
@@ -350,8 +350,8 @@ export async function importCatalog(actorId: string, raw: string) {
           const data = {
             slug: category.slug,
             iconName: category.iconName,
-            iconImageUrl: optionalImage(category.iconImageUrl, category.slug),
-            bannerImageUrl: storedImage(category.bannerImageUrl, category.slug),
+            iconImageUrl: await optionalImage(category.iconImageUrl, category.slug, "cover"),
+            bannerImageUrl: await storedImage(category.bannerImageUrl, category.slug, "banner"),
             isActive: category.isActive,
             sortOrder: category.sortOrder,
             parentId: null,
@@ -416,7 +416,7 @@ export async function importCatalog(actorId: string, raw: string) {
             categoryId: service.categoryId,
             slug: service.slug,
             sku: service.sku,
-            coverImageUrl: optionalImage(service.coverImageUrl, service.slug),
+            coverImageUrl: await optionalImage(service.coverImageUrl, service.slug, "cover"),
             basePrice: new Prisma.Decimal(service.basePrice),
             compareAtPrice: service.compareAtPrice ? new Prisma.Decimal(service.compareAtPrice) : null,
             currency: service.currency,
@@ -452,17 +452,21 @@ export async function importCatalog(actorId: string, raw: string) {
               })),
             ),
           });
-          await tx.serviceImage.createMany({
-            data: file.services.flatMap((service) =>
-              service.images.map((item) => ({
+          const galleryRows: Array<{ id: string; serviceId: string; imageUrl: string; altText: string; sortOrder: number }> = [];
+
+          for (const service of file.services) {
+            for (const item of service.images) {
+              galleryRows.push({
                 id: item.id,
                 serviceId: service.id,
-                imageUrl: storedImage(item.imageUrl, service.slug),
+                imageUrl: await storedImage(item.imageUrl, service.slug, "cover"),
                 altText: item.altText,
                 sortOrder: item.sortOrder,
-              })),
-            ),
-          });
+              });
+            }
+          }
+
+          await tx.serviceImage.createMany({ data: galleryRows });
           await tx.serviceVariant.createMany({
             data: file.services.flatMap((service) =>
               service.variants.map((variant) => ({
@@ -495,8 +499,8 @@ export async function importCatalog(actorId: string, raw: string) {
         for (const banner of file.banners) {
           const data = {
             placement: banner.placement,
-            desktopImageUrl: storedImage(banner.desktopImageUrl, "Banner"),
-            mobileImageUrl: optionalImage(banner.mobileImageUrl, "Banner"),
+            desktopImageUrl: await storedImage(banner.desktopImageUrl, "Banner", "banner"),
+            mobileImageUrl: await optionalImage(banner.mobileImageUrl, "Banner", "banner"),
             linkUrl: banner.linkUrl,
             isActive: banner.isActive,
             sortOrder: banner.sortOrder,

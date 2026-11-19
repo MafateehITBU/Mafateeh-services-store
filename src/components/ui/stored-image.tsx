@@ -1,5 +1,6 @@
 "use client";
 
+import { isDisplayableImage } from "@/lib/display-image";
 import { cn } from "@/lib/utils";
 import { useState } from "react";
 
@@ -10,6 +11,9 @@ export function StoredImage({
   fit = "cover",
   sizing = "intrinsic",
   position = "center",
+  priority = false,
+  width,
+  height,
 }: {
   src: string | null;
   alt: string;
@@ -17,9 +21,12 @@ export function StoredImage({
   fit?: "cover" | "contain";
   sizing?: "intrinsic" | "frame";
   position?: "center" | "bottom";
+  priority?: boolean;
+  width?: number;
+  height?: number;
 }) {
   const [failed, setFailed] = useState(false);
-  const stored = Boolean(src?.startsWith("data:image/"));
+  const stored = isDisplayableImage(src);
 
   if (!stored || failed) {
     return (
@@ -42,6 +49,11 @@ export function StoredImage({
           sizing === "intrinsic" && fit === "cover" && "absolute inset-0 h-full w-full object-cover",
           position === "bottom" && "object-bottom",
         )}
+        width={width}
+        height={height}
+        loading={priority ? "eager" : "lazy"}
+        fetchPriority={priority ? "high" : "auto"}
+        decoding="async"
         onError={() => setFailed(true)}
       />
     </span>

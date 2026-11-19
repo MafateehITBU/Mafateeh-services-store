@@ -3,6 +3,7 @@ import "server-only";
 import { emptyDocument, sanitizeRichText } from "@/features/services/rich-text";
 import { Locale } from "@/generated/prisma/client";
 import { prisma } from "@/lib/prisma";
+import { idsWithStoredImage, mediaPath } from "@/server/media/media-url";
 
 const localeMap = { en: Locale.EN, ar: Locale.AR } as const;
 
@@ -41,12 +42,15 @@ const publishedWhere = {
 export async function listPublicServices(locale: PublicLocale, categorySlug?: string) {
   const language = localeMap[locale];
   const rows = await prisma.service.findMany({
-    where: categorySlug ? { ...publishedWhere, category: { slug: categorySlug, isActive: true } } : publishedWhere,
+    where: categorySlug
+      ? { ...publishedWhere, coverImageUrl: { startsWith: "data:image/" }, category: { slug: categorySlug, isActive: true } }
+      : { ...publishedWhere, coverImageUrl: { startsWith: "data:image/" } },
     orderBy: [{ sortOrder: "asc" }, { publishedAt: "desc" }],
+    take: 48,
     select: {
       id: true,
       slug: true,
-      coverImageUrl: true,
+      updatedAt: true,
       basePrice: true,
       currency: true,
       isFeatured: true,
@@ -60,7 +64,7 @@ export async function listPublicServices(locale: PublicLocale, categorySlug?: st
     const translation = row.translations.find((item) => item.locale === language) ?? row.translations[0];
     const category = row.category.translations.find((item) => item.locale === language) ?? row.category.translations[0];
 
-    if (!translation || !category || !row.coverImageUrl) {
+    if (!translation || !category) {
       return [];
     }
 
@@ -70,7 +74,7 @@ export async function listPublicServices(locale: PublicLocale, categorySlug?: st
         slug: row.slug,
         name: translation.name,
         shortDescription: translation.shortDescription,
-        coverImageUrl: row.coverImageUrl,
+        coverImageUrl: mediaPath("service-cover", row.id, row.updatedAt),
         price: row.basePrice.toString(),
         currency: row.currency,
         isFeatured: row.isFeatured,
@@ -127,7 +131,7 @@ export function parseCategoryPage(value: string | undefined): number {
 const listingSelect = {
   id: true,
   slug: true,
-  coverImageUrl: true,
+  updatedAt: true,
   basePrice: true,
   currency: true,
   isFeatured: true,
@@ -139,7 +143,7 @@ export async function listCategoryServices(locale: PublicLocale, categorySlug: s
   const where = {
     isActive: true,
     publishedAt: { not: null },
-    coverImageUrl: { not: null },
+    coverImageUrl: { startsWith: "data:image/" },
     category: { slug: categorySlug, isActive: true },
   };
   const total = await prisma.service.count({ where });
@@ -163,7 +167,7 @@ export async function listCategoryServices(locale: PublicLocale, categorySlug: s
       const translation = row.translations.find((item) => item.locale === language) ?? row.translations[0];
       const category = row.category.translations.find((item) => item.locale === language) ?? row.category.translations[0];
 
-      if (!translation || !category || !row.coverImageUrl) {
+      if (!translation || !category) {
         return [];
       }
 
@@ -172,7 +176,7 @@ export async function listCategoryServices(locale: PublicLocale, categorySlug: s
         slug: row.slug,
         name: translation.name,
         shortDescription: translation.shortDescription,
-        coverImageUrl: row.coverImageUrl,
+        coverImageUrl: mediaPath("service-cover", row.id, row.updatedAt),
         price: formatAmount(row.basePrice.toString(), locale),
         currency: row.currency,
         isFeatured: row.isFeatured,
@@ -220,7 +224,7 @@ async function rankedCategoryServices(categorySlug: string, skip: number) {
       AND c."isActive" = true
       AND s."isActive" = true
       AND s."publishedAt" IS NOT NULL
-      AND s."coverImageUrl" IS NOT NULL
+      AND left(s."coverImageUrl", 11) = 'data:image/'
     ORDER BY r.average DESC NULLS LAST, r.reviews DESC NULLS LAST, s."publishedAt" DESC
     LIMIT ${categoryPageSize} OFFSET ${skip}
   `;
@@ -262,13 +266,15 @@ export async function searchPublicServices(locale: PublicLocale, query: string) 
   const rows = await prisma.service.findMany({
     where: {
       ...publishedWhere,
+      coverImageUrl: { startsWith: "data:image/" },
       translations: { some: { name: { contains: term, mode: "insensitive" } } },
     },
     orderBy: [{ sortOrder: "asc" }, { publishedAt: "desc" }],
     take: 8,
     select: {
+      id: true,
       slug: true,
-      coverImageUrl: true,
+      updatedAt: true,
       basePrice: true,
       currency: true,
       translations: { select: { locale: true, name: true } },
@@ -278,7 +284,7 @@ export async function searchPublicServices(locale: PublicLocale, query: string) 
   return rows.flatMap((row) => {
     const translation = row.translations.find((item) => item.locale === language) ?? row.translations[0];
 
-    if (!translation || !row.coverImageUrl) {
+    if (!translation) {
       return [];
     }
 
@@ -286,7 +292,7 @@ export async function searchPublicServices(locale: PublicLocale, query: string) 
       {
         slug: row.slug,
         name: translation.name,
-        coverImageUrl: row.coverImageUrl,
+        coverImageUrl: mediaPath("service-cover", row.id, row.updatedAt),
         price: row.basePrice.toString(),
         currency: row.currency,
       },
@@ -297,16 +303,16 @@ export async function searchPublicServices(locale: PublicLocale, query: string) 
 export async function getPublicService(slug: string, locale: PublicLocale) {
   const language = localeMap[locale];
   const service = await prisma.service.findFirst({
-    where: { slug, ...publishedWhere },
+    where: { slug, ...publishedWhere, coverImageUrl: { startsWith: "data:image/" } },
     select: {
       id: true,
       slug: true,
       categoryId: true,
-      coverImageUrl: true,
+      updatedAt: true,
       basePrice: true,
       currency: true,
       translations: true,
-      images: { orderBy: { sortOrder: "asc" }, select: { id: true, imageUrl: true, altText: true } },
+      images: { orderBy: { sortOrder: "asc" }, select: { id: true, altText: true } },
       reviews: {
         where: { status: "APPROVED" },
         orderBy: { createdAt: "desc" },
@@ -316,7 +322,7 @@ export async function getPublicService(slug: string, locale: PublicLocale) {
           rating: true,
           comment: true,
           createdAt: true,
-          user: { select: { firstName: true, lastName: true, avatarUrl: true } },
+          user: { select: { id: true, updatedAt: true, firstName: true, lastName: true } },
         },
       },
       category: { select: { slug: true, translations: { select: { locale: true, title: true } } } },
@@ -325,9 +331,11 @@ export async function getPublicService(slug: string, locale: PublicLocale) {
   const translation = service?.translations.find((item) => item.locale === language) ?? service?.translations[0];
   const category = service?.category.translations.find((item) => item.locale === language) ?? service?.category.translations[0];
 
-  if (!service || !translation || !category || !service.coverImageUrl) {
+  if (!service || !translation || !category) {
     return null;
   }
+
+  const avatars = await idsWithStoredImage("User", "avatarUrl", service.reviews.map((review) => review.user.id));
 
   const [ratings, ratingRows, relatedRows] = await Promise.all([
     approvedRatings([service.id]),
@@ -337,14 +345,14 @@ export async function getPublicService(slug: string, locale: PublicLocale) {
       _count: { _all: true },
     }),
     prisma.service.findMany({
-      where: { ...publishedWhere, categoryId: service.categoryId, id: { not: service.id } },
+      where: { ...publishedWhere, coverImageUrl: { startsWith: "data:image/" }, categoryId: service.categoryId, id: { not: service.id } },
       orderBy: [{ sortOrder: "asc" }, { publishedAt: "desc" }],
       take: 3,
       select: {
         id: true,
         slug: true,
         isFeatured: true,
-        coverImageUrl: true,
+        updatedAt: true,
         basePrice: true,
         currency: true,
         translations: { select: { locale: true, name: true, shortDescription: true } },
@@ -368,8 +376,12 @@ export async function getPublicService(slug: string, locale: PublicLocale) {
     detailedDescription: sanitizeRichText(translation.detailedDescription ?? emptyDocument),
     seoTitle: translation.seoTitle,
     seoDescription: translation.seoDescription,
-    coverImageUrl: service.coverImageUrl,
-    gallery: service.images,
+    coverImageUrl: mediaPath("service-cover", service.id, service.updatedAt),
+    gallery: service.images.map((image) => ({
+      id: image.id,
+      altText: image.altText,
+      imageUrl: mediaPath("service-image", image.id, service.updatedAt),
+    })),
     price: formatAmount(service.basePrice.toString(), locale),
     currency: service.currency,
     category: { slug: service.category.slug, title: category.title },
@@ -382,12 +394,12 @@ export async function getPublicService(slug: string, locale: PublicLocale) {
       comment: review.comment,
       createdAt: review.createdAt.toISOString(),
       author: [review.user.firstName, review.user.lastName].filter(Boolean).join(" "),
-      avatarUrl: review.user.avatarUrl?.startsWith("data:image/") ? review.user.avatarUrl : null,
+      avatarUrl: avatars.has(review.user.id) ? mediaPath("avatar", review.user.id, review.user.updatedAt) : null,
     })),
     related: relatedRows.flatMap((row) => {
       const copy = row.translations.find((item) => item.locale === language) ?? row.translations[0];
 
-      if (!copy || !row.coverImageUrl) {
+      if (!copy) {
         return [];
       }
 
@@ -397,7 +409,7 @@ export async function getPublicService(slug: string, locale: PublicLocale) {
           slug: row.slug,
           name: copy.name,
           shortDescription: copy.shortDescription,
-          coverImageUrl: row.coverImageUrl,
+          coverImageUrl: mediaPath("service-cover", row.id, row.updatedAt),
           price: formatAmount(row.basePrice.toString(), locale),
           currency: row.currency,
           isFeatured: row.isFeatured,

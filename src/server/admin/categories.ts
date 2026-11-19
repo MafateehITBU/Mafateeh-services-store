@@ -24,9 +24,9 @@ function assertId(id: string) {
   }
 }
 
-function storedImage(value: string) {
+async function storedImage(value: string) {
   try {
-    return imageFromDataUrl(value).dataUrl;
+    return (await imageFromDataUrl(value, "banner")).dataUrl;
   } catch (error) {
     if (error instanceof ImageStorageError) {
       throw new CategoryRuleError(400, "invalid_image", error.message);
@@ -36,9 +36,9 @@ function storedImage(value: string) {
   }
 }
 
-function storedOptionalImage(value: string | null) {
+async function storedOptionalImage(value: string | null) {
   try {
-    return optionalImageFromDataUrl(value);
+    return await optionalImageFromDataUrl(value, "cover");
   } catch (error) {
     if (error instanceof ImageStorageError) {
       throw new CategoryRuleError(400, "invalid_image", error.message);
@@ -250,8 +250,8 @@ export async function getCategory(id: string) {
 }
 
 export async function createCategory(actorId: string, input: CategoryInput) {
-  const image = storedOptionalImage(input.image);
-  const banner = storedImage(input.banner);
+  const image = await storedOptionalImage(input.image);
+  const banner = await storedImage(input.banner);
   const slug = await allocateSlug(input.en.title);
 
   try {
@@ -300,8 +300,8 @@ export async function updateCategory(actorId: string, id: string, input: Categor
     throw new CategoryRuleError(404, "not_found", "That category was not found.");
   }
 
-  const image = storedOptionalImage(input.image);
-  const banner = storedImage(input.banner);
+  const image = await storedOptionalImage(input.image);
+  const banner = await storedImage(input.banner);
   const slug = await allocateSlug(input.en.title, id);
 
   try {

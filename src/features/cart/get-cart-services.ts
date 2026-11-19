@@ -2,6 +2,7 @@ import "server-only";
 
 import { Locale } from "@/generated/prisma/client";
 import { prisma } from "@/lib/prisma";
+import { idsWithStoredImage, mediaPath } from "@/server/media/media-url";
 
 const localeMap = { en: Locale.EN, ar: Locale.AR } as const;
 const idPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
@@ -34,7 +35,7 @@ export async function listCartServices(locale: keyof typeof localeMap, ids: stri
     select: {
       id: true,
       slug: true,
-      coverImageUrl: true,
+      updatedAt: true,
       basePrice: true,
       compareAtPrice: true,
       currency: true,
@@ -42,6 +43,7 @@ export async function listCartServices(locale: keyof typeof localeMap, ids: stri
     },
   });
   const byId = new Map(rows.map((row) => [row.id, row]));
+  const covers = await idsWithStoredImage("Service", "coverImageUrl", rows.map((row) => row.id));
 
   return unique.flatMap((id) => {
     const row = byId.get(id);
@@ -59,7 +61,7 @@ export async function listCartServices(locale: keyof typeof localeMap, ids: stri
         id: row.id,
         slug: row.slug,
         name: translation.name,
-        coverImageUrl: row.coverImageUrl,
+        coverImageUrl: covers.has(row.id) ? mediaPath("service-cover", row.id, row.updatedAt) : null,
         currency: row.currency,
         price,
         compareAtPrice: compareAt !== null && Number.isFinite(compareAt) && compareAt > price ? compareAt : null,

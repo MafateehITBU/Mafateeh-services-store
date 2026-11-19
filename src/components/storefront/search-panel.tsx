@@ -108,7 +108,7 @@ export function SearchPanel({ open, onClose }: { open: boolean; onClose: () => v
               {results.map((result) => (
                 <li key={result.slug}>
                   <Link href={`/services/${result.slug}`} onClick={close} className="flex cursor-pointer items-center gap-3 py-3">
-                    <StoredImage src={result.coverImageUrl} alt="" className="size-14 shrink-0 rounded-xl" />
+                    <StoredImage src={result.coverImageUrl} alt="" className="size-14 shrink-0 rounded-xl" width={56} height={56} />
                     <span className="min-w-0 flex-1">
                       <span className="block truncate font-semibold">{result.name}</span>
                       <span className="mt-1 block text-sm text-brand">{result.price} {result.currency}</span>

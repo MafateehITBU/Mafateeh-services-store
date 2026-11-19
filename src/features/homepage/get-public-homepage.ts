@@ -3,6 +3,7 @@ import "server-only";
 import { bannerDestinationHref } from "@/features/homepage/banner-destination";
 import { Locale, Prisma } from "@/generated/prisma/client";
 import { prisma } from "@/lib/prisma";
+import { idsWithStoredImage, mediaPath } from "@/server/media/media-url";
 import { connection } from "next/server";
 import { cache } from "react";
 
@@ -46,7 +47,7 @@ async function ratingsFor(serviceIds: string[]) {
 const serviceSelect = {
   id: true,
   slug: true,
-  coverImageUrl: true,
+  updatedAt: true,
   basePrice: true,
   currency: true,
   sortOrder: true,
@@ -69,10 +70,10 @@ function preferredTranslation<T extends { locale: Locale }>(rows: T[], locale: L
   return rows.find((item) => item.locale === locale) ?? rows[0] ?? null;
 }
 
-function presentService(service: ServiceRow, locale: Locale, rating?: { ratingAverage: number | null; reviewCount: number }) {
+function presentService(service: ServiceRow, locale: Locale, covers: Set<string>, rating?: { ratingAverage: number | null; reviewCount: number }) {
   const translation = preferredTranslation(service.translations, locale);
 
-  if (!translation || !service.coverImageUrl) {
+  if (!translation || !covers.has(service.id)) {
     return null;
   }
 
@@ -81,7 +82,7 @@ function presentService(service: ServiceRow, locale: Locale, rating?: { ratingAv
     slug: service.slug,
     name: translation.name,
     shortDescription: translation.shortDescription,
-    coverImageUrl: service.coverImageUrl,
+    coverImageUrl: mediaPath("service-cover", service.id, service.updatedAt),
     price: service.basePrice.toString(),
     currency: service.currency,
     ratingAverage: rating?.ratingAverage ?? null,
@@ -91,8 +92,7 @@ function presentService(service: ServiceRow, locale: Locale, rating?: { ratingAv
 
 type BannerRow = {
   id: string;
-  desktopImageUrl: string;
-  mobileImageUrl: string | null;
+  updatedAt: Date;
   linkUrl: string | null;
   translations: Array<{ locale: Locale; title: string; subtitle: string | null; buttonLabel: string | null }>;
 };
@@ -108,7 +108,7 @@ type SectionRow = {
     id: string;
     slug: string;
     isActive: boolean;
-    iconImageUrl: string | null;
+    updatedAt: Date;
     translations: Array<{ locale: Locale; title: string }>;
   } | null;
   services: Array<{
@@ -133,17 +133,17 @@ export type PublicHomeBlock =
   | { id: string; type: "HOME_SECTION"; section: PublicSection }
   | { id: string; type: "TESTIMONIAL_CAROUSEL" };
 
-function presentBanner(banner: BannerRow, locale: Locale): PublicBanner | null {
+function presentBanner(banner: BannerRow, locale: Locale, desktops: Set<string>): PublicBanner | null {
   const translation = preferredTranslation(banner.translations, locale);
 
-  if (!translation || !banner.desktopImageUrl.startsWith("data:image/")) {
+  if (!translation || !desktops.has(banner.id)) {
     return null;
   }
 
   return {
     id: banner.id,
-    desktopImageUrl: banner.desktopImageUrl,
-    mobileImageUrl: banner.mobileImageUrl,
+    desktopImageUrl: mediaPath("banner-desktop", banner.id, banner.updatedAt),
+    mobileImageUrl: mediaPath("banner-mobile", banner.id, banner.updatedAt),
     linkUrl: bannerDestinationHref(banner.linkUrl),
     title: translation.title,
     subtitle: translation.subtitle,
@@ -156,6 +156,8 @@ function presentSection(
   locale: Locale,
   ratings: Map<string, { ratingAverage: number | null; reviewCount: number }>,
   fallbackServices: Array<ServiceRow & { categoryId: string }>,
+  covers: Set<string>,
+  icons: Set<string>,
 ): PublicSection | null {
   const translation = preferredTranslation(section.translations, locale);
   const categoryTranslation = section.category ? preferredTranslation(section.category.translations, locale) : null;
@@ -165,7 +167,7 @@ function presentSection(
   }
 
   const category = section.category?.isActive && categoryTranslation
-    ? { slug: section.category.slug, title: categoryTranslation.title, imageUrl: section.category.iconImageUrl }
+    ? { slug: section.category.slug, title: categoryTranslation.title, imageUrl: icons.has(section.category.id) ? mediaPath("category-icon", section.category.id, section.category.updatedAt) : null }
     : null;
 
   if (section.type === "FEATURED_CATEGORIES") {
@@ -185,7 +187,7 @@ function presentSection(
       return [];
     }
 
-    const card = presentService(service, locale, ratings.get(service.id));
+    const card = presentService(service, locale, covers, ratings.get(service.id));
     return card ? [card] : [];
   });
   const services = explicit.length > 0
@@ -194,7 +196,7 @@ function presentSection(
       ? fallbackServices
           .filter((service) => service.categoryId === section.category?.id)
           .flatMap((service) => {
-            const card = presentService(service, locale, ratings.get(service.id));
+            const card = presentService(service, locale, covers, ratings.get(service.id));
             return card ? [card] : [];
           })
           .slice(0, section.maxItems)
@@ -219,7 +221,7 @@ const sectionInclude = {
       id: true,
       slug: true,
       isActive: true,
-      iconImageUrl: true,
+      updatedAt: true,
       translations: { select: { locale: true, title: true } },
     },
   },
@@ -255,8 +257,7 @@ async function loadPublicHomepage(locale: PublicLocale) {
           isActive: true,
           startsAt: true,
           endsAt: true,
-          desktopImageUrl: true,
-          mobileImageUrl: true,
+          updatedAt: true,
           linkUrl: true,
           translations: true,
         },
@@ -268,7 +269,7 @@ async function loadPublicHomepage(locale: PublicLocale) {
     ? await prisma.storeBanner.findMany({
         where: { placement: "HOME_HERO", ...scheduled(now) },
         orderBy: [{ sortOrder: "asc" }, { createdAt: "asc" }],
-        select: { id: true, desktopImageUrl: true, mobileImageUrl: true, linkUrl: true, translations: true },
+        select: { id: true, updatedAt: true, linkUrl: true, translations: true },
       })
     : [];
   const sections = items.flatMap((item) => (item.section ? [item.section] : []));
@@ -282,12 +283,19 @@ async function loadPublicHomepage(locale: PublicLocale) {
       })
     : [];
   const ratings = await ratingsFor([...linkedIds, ...fallbackServices.map((service) => service.id)]);
+  const bannerIds = [...heroSlides.map((banner) => banner.id), ...items.flatMap((item) => (item.banner ? [item.banner.id] : []))];
+  const iconIds = sections.flatMap((section) => (section.category ? [section.category.id] : []));
+  const [covers, desktops, icons] = await Promise.all([
+    idsWithStoredImage("Service", "coverImageUrl", [...linkedIds, ...fallbackServices.map((service) => service.id)]),
+    idsWithStoredImage("StoreBanner", "desktopImageUrl", bannerIds),
+    idsWithStoredImage("Category", "iconImageUrl", iconIds),
+  ]);
   const blocks: PublicHomeBlock[] = [];
 
   for (const item of items) {
     if (item.type === "HERO_CAROUSEL") {
       const banners = heroSlides.flatMap((banner) => {
-        const card = presentBanner(banner, language);
+        const card = presentBanner(banner, language, desktops);
         return card ? [card] : [];
       }).slice(0, 1);
 
@@ -300,7 +308,7 @@ async function loadPublicHomepage(locale: PublicLocale) {
 
     if (item.type === "PROMOTIONAL_BANNER" && item.banner) {
       const current = item.banner.isActive && (!item.banner.startsAt || item.banner.startsAt <= now) && (!item.banner.endsAt || item.banner.endsAt >= now);
-      const banner = current ? presentBanner(item.banner, language) : null;
+      const banner = current ? presentBanner(item.banner, language, desktops) : null;
 
       if (banner) {
         blocks.push({ id: item.id, type: "PROMOTIONAL_BANNER", banner });
@@ -315,7 +323,7 @@ async function loadPublicHomepage(locale: PublicLocale) {
     }
 
     if (item.type === "HOME_SECTION" && item.section) {
-      const section = presentSection(item.section, language, ratings, fallbackServices);
+      const section = presentSection(item.section, language, ratings, fallbackServices, covers, icons);
 
       if (section) {
         blocks.push({ id: item.id, type: "HOME_SECTION", section });

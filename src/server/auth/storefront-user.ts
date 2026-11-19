@@ -1,6 +1,7 @@
 import "server-only";
 
 import { prisma } from "@/lib/prisma";
+import { idsWithStoredImage, mediaPath } from "@/server/media/media-url";
 import { readCustomerSession } from "@/server/auth/customer-session";
 
 export async function readStorefrontCustomer() {
@@ -13,19 +14,20 @@ export async function readStorefrontCustomer() {
 
     const user = await prisma.user.findUnique({
       where: { id: session.userId },
-      select: { id: true, role: true, status: true, firstName: true, profileCompletedAt: true, avatarUrl: true, sessionVersion: true },
+      select: { id: true, role: true, status: true, firstName: true, profileCompletedAt: true, updatedAt: true, sessionVersion: true },
     });
 
     if (!user || user.role !== "CUSTOMER" || user.status !== "ACTIVE" || user.sessionVersion !== session.sessionVersion) {
       return null;
     }
 
+    const avatars = await idsWithStoredImage("User", "avatarUrl", [user.id]);
     const firstName = user.firstName?.trim() ?? "";
 
     return {
       id: user.id,
       firstName,
-      avatarUrl: user.avatarUrl?.startsWith("data:image/") ? user.avatarUrl : null,
+      avatarUrl: avatars.has(user.id) ? mediaPath("avatar", user.id, user.updatedAt) : null,
       needsProfile: !user.profileCompletedAt || firstName.length === 0,
     };
   } catch {

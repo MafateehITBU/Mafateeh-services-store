@@ -5,6 +5,7 @@ import { Locale } from "@/generated/prisma/client";
 import { prisma } from "@/lib/prisma";
 import { readCustomerSession } from "@/server/auth/customer-session";
 import { ImageStorageError, imageFromDataUrl } from "@/server/media/image-storage";
+import { idsWithStoredImage, mediaPath } from "@/server/media/media-url";
 
 const publishedService = {
   isActive: true,
@@ -30,7 +31,7 @@ async function requireCustomer() {
       lastName: true,
       phone: true,
       phoneCountry: true,
-      avatarUrl: true,
+      updatedAt: true,
       sessionVersion: true,
     },
   });
@@ -64,13 +65,15 @@ export async function readCustomerAccount() {
 
   const country = countryFromPhone(user.phone, user.phoneCountry);
 
+  const avatars = await idsWithStoredImage("User", "avatarUrl", [user.id]);
+
   return {
     firstName: user.firstName ?? "",
     lastName: user.lastName ?? "",
     email: user.email,
     countryIso: country.iso,
     phone: nationalFromPhone(user.phone, country),
-    avatarUrl: user.avatarUrl?.startsWith("data:image/") ? user.avatarUrl : null,
+    avatarUrl: avatars.has(user.id) ? mediaPath("avatar", user.id, user.updatedAt) : null,
   };
 }
 
@@ -106,9 +109,9 @@ export async function updateCustomerAccount(input: {
 
   let avatarUrl: string | undefined;
 
-  if (input.avatar) {
+  if (input.avatar && !input.avatar.startsWith("/media/avatar/")) {
     try {
-      avatarUrl = imageFromDataUrl(input.avatar).dataUrl;
+      avatarUrl = (await imageFromDataUrl(input.avatar, "avatar")).dataUrl;
     } catch (error) {
       if (error instanceof ImageStorageError) {
         return { ok: false as const, status: 400, error: "invalid_image" };
@@ -185,14 +188,14 @@ export async function listCustomerWishlist(locale: "en" | "ar") {
 
   const language = locale === "ar" ? Locale.AR : Locale.EN;
   const rows = await prisma.wishlistItem.findMany({
-    where: { userId: user.id, service: publishedService },
+    where: { userId: user.id, service: { ...publishedService, coverImageUrl: { startsWith: "data:image/" } } },
     orderBy: { createdAt: "desc" },
     select: {
       service: {
         select: {
           id: true,
           slug: true,
-          coverImageUrl: true,
+          updatedAt: true,
           currency: true,
           basePrice: true,
           isFeatured: true,
@@ -216,7 +219,7 @@ export async function listCustomerWishlist(locale: "en" | "ar") {
   return rows.flatMap((row) => {
     const translation = row.service.translations[0];
 
-    if (!translation || !row.service.coverImageUrl) {
+    if (!translation) {
       return [];
     }
 
@@ -229,7 +232,7 @@ export async function listCustomerWishlist(locale: "en" | "ar") {
         slug: row.service.slug,
         name: translation.name,
         shortDescription: translation.shortDescription,
-        coverImageUrl: row.service.coverImageUrl,
+        coverImageUrl: mediaPath("service-cover", row.service.id, row.service.updatedAt),
         price: money(row.service.basePrice, locale),
         currency: row.service.currency,
         isFeatured: row.service.isFeatured,

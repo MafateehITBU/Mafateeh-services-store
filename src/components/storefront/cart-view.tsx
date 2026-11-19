@@ -113,7 +113,7 @@ export function CartView({ locale }: { locale: "en" | "ar" }) {
         {lines.map((line) => (
           <li key={line.id} className="flex flex-col gap-4 border-b border-[#ececec] py-5 sm:flex-row sm:items-center">
             <Link href={`/services/${line.slug}`} className="shrink-0">
-              <StoredImage src={line.coverImageUrl} alt={line.name} className="size-20 rounded-xl" />
+              <StoredImage src={line.coverImageUrl} alt={line.name} className="size-20 rounded-xl" width={80} height={80} />
             </Link>
             <div className="min-w-0 flex-1">
               <Link href={`/services/${line.slug}`} className="font-semibold text-ink hover:text-brand">

@@ -24,7 +24,7 @@ export function ServiceGallery({
 
   return (
     <div className="space-y-3">
-      <StoredImage src={active?.imageUrl ?? coverImageUrl} alt={active?.altText || name} className="aspect-[4/3] w-full rounded-3xl" />
+      <StoredImage src={active?.imageUrl ?? coverImageUrl} alt={active?.altText || name} className="aspect-[4/3] w-full rounded-3xl" width={1200} height={900} />
       {gallery.length > 0 ? (
         <div className="grid grid-cols-4 gap-3">
           {images.map((image) => {
@@ -39,7 +39,7 @@ export function ServiceGallery({
                 onClick={() => setActiveId(image.id)}
                 className={`cursor-pointer overflow-hidden rounded-xl ${selected ? "ring-2 ring-[#157037]" : "ring-1 ring-[#e4ebe6]"}`}
               >
-                <StoredImage src={image.imageUrl} alt="" className="aspect-square w-full" />
+                <StoredImage src={image.imageUrl} alt="" className="aspect-square w-full" width={240} height={240} />
               </button>
             );
           })}

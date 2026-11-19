@@ -63,9 +63,9 @@ function assertId(id: string) {
   }
 }
 
-function storedImage(value: string) {
+async function storedImage(value: string) {
   try {
-    return imageFromDataUrl(value).dataUrl;
+    return (await imageFromDataUrl(value, "banner")).dataUrl;
   } catch (error) {
     if (error instanceof ImageStorageError) {
       throw new HomepageRuleError(400, "invalid_image", error.message);
@@ -75,9 +75,9 @@ function storedImage(value: string) {
   }
 }
 
-function storedOptionalImage(value: string | null) {
+async function storedOptionalImage(value: string | null) {
   try {
-    return optionalImageFromDataUrl(value);
+    return await optionalImageFromDataUrl(value, "banner");
   } catch (error) {
     if (error instanceof ImageStorageError) {
       throw new HomepageRuleError(400, "invalid_image", error.message);
@@ -297,8 +297,8 @@ async function writeBanner(tx: Tx, bannerId: string | undefined, input: BannerIn
 
   const data = {
     placement: input.placement as BannerPlacement,
-    desktopImageUrl: storedImage(input.desktop),
-    mobileImageUrl: storedOptionalImage(input.mobile),
+    desktopImageUrl: await storedImage(input.desktop),
+    mobileImageUrl: await storedOptionalImage(input.mobile),
     linkUrl: input.linkUrl,
     isActive: input.isActive,
     sortOrder: input.sortOrder,

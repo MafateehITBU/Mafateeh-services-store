@@ -2,6 +2,7 @@ import "server-only";
 
 import type { PublicTestimonial } from "@/features/reviews/types";
 import { prisma } from "@/lib/prisma";
+import { idsWithStoredImage, mediaPath } from "@/server/media/media-url";
 
 type PublicLocale = "en" | "ar";
 
@@ -18,9 +19,10 @@ export async function listHomepageTestimonials(locale: PublicLocale): Promise<Pu
       rating: true,
       comment: true,
       service: { select: { slug: true } },
-      user: { select: { firstName: true, lastName: true, avatarUrl: true } },
+      user: { select: { id: true, updatedAt: true, firstName: true, lastName: true } },
     },
   });
+  const avatars = await idsWithStoredImage("User", "avatarUrl", rows.map((row) => row.user.id));
   const approved = rows.flatMap((row) => {
     const name = [row.user.firstName, row.user.lastName].filter(Boolean).join(" ");
 
@@ -33,7 +35,7 @@ export async function listHomepageTestimonials(locale: PublicLocale): Promise<Pu
         id: row.id,
         name,
         location: null,
-        avatarUrl: row.user.avatarUrl?.startsWith("data:image/") ? row.user.avatarUrl : null,
+        avatarUrl: avatars.has(row.user.id) ? mediaPath("avatar", row.user.id, row.user.updatedAt) : null,
         rating: row.rating,
         comment: row.comment,
         serviceHref: `/services/${row.service.slug}`,

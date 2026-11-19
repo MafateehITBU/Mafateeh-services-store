@@ -5,7 +5,7 @@ const nextConfig: NextConfig = {
   poweredByHeader: false,
   cacheComponents: true,
   partialPrefetching: true,
-  serverExternalPackages: ["@prisma/adapter-pg", "pg", "nodemailer"],
+  serverExternalPackages: ["@prisma/adapter-pg", "pg", "nodemailer", "sharp"],
   // next-intl's config plugin loads a native SWC binding that this machine
   // blocks. The alias below is the same link that plugin would add for
   // src/i18n/request.ts.

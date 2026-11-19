@@ -1,5 +1,6 @@
 "use client";
 
+import { isDisplayableImage } from "@/lib/display-image";
 import { cn } from "@/lib/utils";
 import { useState } from "react";
 
@@ -13,7 +14,7 @@ export function FramedArtwork({
   className?: string;
 }) {
   const [failed, setFailed] = useState(false);
-  const stored = Boolean(src?.startsWith("data:image/"));
+  const stored = isDisplayableImage(src);
 
   if (!stored || failed) {
     return (
@@ -26,7 +27,7 @@ export function FramedArtwork({
   return (
     <span className={cn("relative block overflow-hidden", className)}>
       {/* eslint-disable-next-line @next/next/no-img-element */}
-      <img src={src ?? undefined} alt={alt} className="absolute inset-0 h-full w-full object-cover object-center" onError={() => setFailed(true)} />
+      <img src={src ?? undefined} alt={alt} width={1200} height={720} loading="lazy" decoding="async" className="absolute inset-0 h-full w-full object-cover object-center" onError={() => setFailed(true)} />
     </span>
   );
 }

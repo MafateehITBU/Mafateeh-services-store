@@ -4,7 +4,7 @@ import { emptyDocument, RichTextError, sanitizeRichText } from "@/features/servi
 import { Locale, Prisma } from "@/generated/prisma/client";
 import { prisma } from "@/lib/prisma";
 import { writeAdminAuditLog } from "@/server/admin/audit";
-import { ImageStorageError, imageFromDataUrl, optionalImageFromDataUrl } from "@/server/media/image-storage";
+import { ImageStorageError, imageFromDataUrl, isStoredDataImage, optionalImageFromDataUrl } from "@/server/media/image-storage";
 import type { ServiceInput } from "@/validations/service";
 import { z } from "zod";
 
@@ -68,9 +68,9 @@ function assertId(id: string) {
   }
 }
 
-function storedImage(value: string) {
+async function storedImage(value: string) {
   try {
-    return imageFromDataUrl(value).dataUrl;
+    return (await imageFromDataUrl(value, "cover")).dataUrl;
   } catch (error) {
     if (error instanceof ImageStorageError) {
       throw new ServiceRuleError(400, "invalid_image", error.message);
@@ -80,9 +80,9 @@ function storedImage(value: string) {
   }
 }
 
-function storedOptionalImage(value: string | null) {
+async function storedOptionalImage(value: string | null) {
   try {
-    return optionalImageFromDataUrl(value);
+    return await optionalImageFromDataUrl(value, "cover");
   } catch (error) {
     if (error instanceof ImageStorageError) {
       throw new ServiceRuleError(400, "invalid_image", error.message);
@@ -289,16 +289,16 @@ function assertPublishable(input: ServiceInput, cover: string | null) {
   }
 }
 
-function prepared(input: ServiceInput) {
+async function prepared(input: ServiceInput) {
   return {
-    cover: storedOptionalImage(input.cover),
-    gallery: input.gallery.map((item) => ({ dataUrl: storedImage(item.image), altText: item.altText || input.en.name })),
+    cover: await storedOptionalImage(input.cover),
+    gallery: await Promise.all(input.gallery.map(async (item) => ({ dataUrl: await storedImage(item.image), altText: item.altText || input.en.name }))),
     en: description(input.en.detailedDescription),
     ar: description(input.ar.detailedDescription),
   };
 }
 
-async function writeService(tx: Tx, serviceId: string | undefined, input: ServiceInput, preparedInput: ReturnType<typeof prepared>, publishing: boolean) {
+async function writeService(tx: Tx, serviceId: string | undefined, input: ServiceInput, preparedInput: Awaited<ReturnType<typeof prepared>>, publishing: boolean) {
   const category = await tx.category.findUnique({ where: { id: input.categoryId }, select: { id: true, isActive: true } });
 
   if (!category) {
@@ -574,7 +574,7 @@ export async function createService(actorId: string, input: ServiceInput) {
     throw new ServiceRuleError(400, "invalid_request", "Save the new service as a draft or publish it.");
   }
 
-  const stored = prepared(input);
+  const stored = await prepared(input);
 
   if (input.intent === "publish") {
     assertPublishable(input, stored.cover);
@@ -602,7 +602,7 @@ export async function updateService(actorId: string, id: string, input: ServiceI
     throw new ServiceRuleError(400, "already_published", "Deactivate a published service instead of turning it back into a draft.");
   }
 
-  const stored = prepared(input);
+  const stored = await prepared(input);
   const staysPublished = input.intent === "keep" && Boolean(before.publishedAt) && before.isActive;
 
   if (input.intent === "publish" || staysPublished) {
@@ -665,7 +665,7 @@ export async function setServiceStatus(actorId: string, id: string, action: "pub
     })),
   } as ServiceInput;
 
-  assertPublishable(input, storedOptionalImage(current.coverImageUrl));
+  assertPublishable(input, isStoredDataImage(current.coverImageUrl) ? current.coverImageUrl : null);
 
   if (!current.category.isActive) {
     throw new ServiceRuleError(400, "inactive_category", "Activate the category or choose another active category before publishing.");
