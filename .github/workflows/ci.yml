@@ -38,6 +38,8 @@ jobs:
           node-version: 22
           cache: npm
       - uses: gitleaks/gitleaks-action@v2
+        env:
+          GITLEAKS_CONFIG: .gitleaks.toml
       - run: npm ci
       - run: npm run lint
       - run: npm run typecheck

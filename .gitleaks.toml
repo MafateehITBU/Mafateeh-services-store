@@ -1,0 +1,6 @@
+[extend]
+useDefault = true
+
+[allowlist]
+description = "Store catalog images are data URLs, not credentials."
+paths = ['''data/mafateeh-catalog\.json''']

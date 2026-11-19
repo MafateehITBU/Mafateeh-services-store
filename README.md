@@ -111,6 +111,12 @@ $env:SUPER_ADMIN_EMAIL="person@example.com"; $env:SUPER_ADMIN_PASSWORD="choose-a
 
 The command reads `SUPER_ADMIN_EMAIL`, `SUPER_ADMIN_PASSWORD`, and `DATABASE_URL`. The password must be at least 12 characters. It stores only a hash. It creates that email as an active `SUPER_ADMIN`, or promotes an existing active account and sets the password. It does not change a deactivated or suspended account. Do not put a real address or password in source code.
 
+## Store catalog
+
+`data/mafateeh-catalog.json` is the store database file for the dashboard. It holds the categories, services, banners, and homepage. It does not hold customers, orders, reviews, or passwords.
+
+After the database migrations are applied and an administrator exists, sign in and open **Settings**. Under **Move store content**, choose `data/mafateeh-catalog.json`, then choose **Import catalog** and confirm. The import adds or updates those rows in the database you are signed into.
+
 Uploaded images are stored in PostgreSQL as base64 data URLs. They are not written to disk and are not sent to an image host. Static files such as the Mafateeh logo stay in `public/`.
 
 ## Production build

@@ -7,6 +7,7 @@ Read this file before starting any task. Update it when a decision changes. The 
 - One Next.js App Router app. English is LTR and Arabic is RTL. The header stays `dir=ltr`.
 - Stay on Prisma 7.10.1. Do not run bare `npx prisma`, and do not upgrade to the Prisma 8 release candidate.
 - Uploaded images stay in PostgreSQL as data URLs. Public pages receive `/media/<kind>/<id>?v=<updatedAt>` and do not load the base64 column in list queries. `/media` stays outside the language redirect.
+- `data/mafateeh-catalog.json` is the store catalog for the dashboard import. It is not a PostgreSQL dump and does not include customers, orders, reviews, or passwords.
 - Customers sign in with a 6-digit email code. Administrators use a password. Sessions carry `sessionVersion` and stop working when credentials or status change.
 - Do not start checkout or MEPS until that work is requested.
 - `TRUSTED_PROXY_HEADER` stays empty unless the app is behind a proxy you trust. Forwarded addresses are ignored until it is set.
