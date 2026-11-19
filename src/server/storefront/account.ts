@@ -3,7 +3,7 @@ import "server-only";
 import { countryFromPhone, findCountry, nationalFromPhone, normalizeNationalNumber } from "@/lib/countries";
 import { Locale } from "@/generated/prisma/client";
 import { prisma } from "@/lib/prisma";
-import { readCustomerSessionUserId } from "@/server/auth/customer-session";
+import { readCustomerSession } from "@/server/auth/customer-session";
 import { ImageStorageError, imageFromDataUrl } from "@/server/media/image-storage";
 
 const publishedService = {
@@ -13,14 +13,14 @@ const publishedService = {
 } as const;
 
 async function requireCustomer() {
-  const userId = await readCustomerSessionUserId();
+  const session = await readCustomerSession();
 
-  if (!userId) {
+  if (!session) {
     return null;
   }
 
   const user = await prisma.user.findUnique({
-    where: { id: userId },
+    where: { id: session.userId },
     select: {
       id: true,
       role: true,
@@ -31,10 +31,11 @@ async function requireCustomer() {
       phone: true,
       phoneCountry: true,
       avatarUrl: true,
+      sessionVersion: true,
     },
   });
 
-  if (!user || user.role !== "CUSTOMER" || user.status !== "ACTIVE") {
+  if (!user || user.role !== "CUSTOMER" || user.status !== "ACTIVE" || user.sessionVersion !== session.sessionVersion) {
     return null;
   }
 

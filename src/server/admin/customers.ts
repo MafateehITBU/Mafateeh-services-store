@@ -171,6 +171,7 @@ export async function updateCustomerStatus(actorId: string, id: string, status: 
     data: {
       status,
       deactivatedAt: status === "ACTIVE" ? null : new Date(),
+      ...(status === "ACTIVE" ? {} : { sessionVersion: { increment: 1 } }),
     },
     select: { id: true, status: true, role: true },
   });

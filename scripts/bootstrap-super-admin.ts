@@ -1,20 +1,42 @@
 import { config } from "dotenv";
 import { PrismaPg } from "@prisma/adapter-pg";
+import { createInterface } from "node:readline";
 import { PrismaClient } from "../src/generated/prisma/client";
 import { z } from "zod";
 import { hashPassword } from "../src/server/admin/password";
+import { newPasswordSchema } from "../src/validations/admin-operations";
 
 config();
 
 const emailSchema = z.string().trim().email().max(254);
-const passwordSchema = z.string().min(12).max(200);
+
+function readHiddenPassword() {
+  if (process.env.SUPER_ADMIN_PASSWORD) {
+    return Promise.resolve(process.env.SUPER_ADMIN_PASSWORD);
+  }
+
+  const rl = createInterface({ input: process.stdin, output: process.stdout, terminal: true });
+  const question = "SUPER_ADMIN_PASSWORD: ";
+
+  return new Promise<string>((resolve) => {
+    const output = (rl as unknown as { output: NodeJS.WriteStream }).output;
+    const write = output.write.bind(output);
+    output.write = (text: string) => (text.startsWith(question) ? write(text) : true);
+    rl.question(question, (answer) => {
+      output.write = write;
+      rl.close();
+      write("\n");
+      resolve(answer);
+    });
+  });
+}
 
 async function main() {
   const emailResult = emailSchema.safeParse(process.env.SUPER_ADMIN_EMAIL);
-  const passwordResult = passwordSchema.safeParse(process.env.SUPER_ADMIN_PASSWORD);
+  const passwordResult = newPasswordSchema.safeParse(await readHiddenPassword());
 
   if (!emailResult.success || !passwordResult.success) {
-    console.error("Set SUPER_ADMIN_EMAIL and SUPER_ADMIN_PASSWORD. The password must be at least 12 characters.");
+    console.error("Set SUPER_ADMIN_EMAIL. The password must be at least 12 characters and can be typed when SUPER_ADMIN_PASSWORD is not set.");
     process.exitCode = 1;
     return;
   }

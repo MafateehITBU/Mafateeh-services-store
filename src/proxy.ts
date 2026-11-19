@@ -2,6 +2,7 @@ import createMiddleware from "next-intl/middleware";
 import { jwtVerify } from "jose";
 import { NextResponse, type NextRequest } from "next/server";
 import { routing } from "./i18n/routing";
+import { SESSION_ISSUER, derivedSecret } from "./server/security/session-keys";
 
 const handleI18nRouting = createMiddleware(routing);
 
@@ -14,8 +15,13 @@ async function hasSignedAdminSession(request: NextRequest) {
   }
 
   try {
-    const { payload } = await jwtVerify(token, new TextEncoder().encode(secret));
-    return payload.kind === "admin" && typeof payload.sub === "string" && payload.sub.length > 0;
+    const key = await derivedSecret(secret, "admin-session");
+    const { payload } = await jwtVerify(token, key, {
+      algorithms: ["HS256"],
+      issuer: SESSION_ISSUER,
+      audience: "admin",
+    });
+    return payload.kind === "admin" && typeof payload.sub === "string" && payload.sub.length > 0 && typeof payload.sv === "number";
   } catch {
     return false;
   }

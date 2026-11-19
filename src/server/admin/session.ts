@@ -1,11 +1,13 @@
 import "server-only";
 
 import { AdminConfigError, readSessionSecret } from "@/lib/admin-env";
+import { SESSION_ISSUER, derivedSecret } from "@/server/security/session-keys";
 import { SignJWT, jwtVerify } from "jose";
 import { cookies } from "next/headers";
 
 export const ADMIN_SESSION_COOKIE = "mafateeh_admin_session";
 const SESSION_SECONDS = 60 * 60 * 8;
+const AUDIENCE = "admin";
 
 function cookieOptions(maxAge: number) {
   return {
@@ -17,17 +19,19 @@ function cookieOptions(maxAge: number) {
   };
 }
 
-function secretKey() {
-  return new TextEncoder().encode(readSessionSecret());
+async function secretKey() {
+  return derivedSecret(readSessionSecret(), "admin-session");
 }
 
-export async function createAdminSession(userId: string) {
-  const token = await new SignJWT({ kind: "admin" })
+export async function createAdminSession(userId: string, sessionVersion: number) {
+  const token = await new SignJWT({ kind: "admin", sv: sessionVersion })
     .setProtectedHeader({ alg: "HS256" })
     .setSubject(userId)
+    .setIssuer(SESSION_ISSUER)
+    .setAudience(AUDIENCE)
     .setIssuedAt()
     .setExpirationTime(`${SESSION_SECONDS}s`)
-    .sign(secretKey());
+    .sign(await secretKey());
 
   const jar = await cookies();
   jar.set(ADMIN_SESSION_COOKIE, token, cookieOptions(SESSION_SECONDS));
@@ -38,7 +42,7 @@ export async function clearAdminSession() {
   jar.set(ADMIN_SESSION_COOKIE, "", cookieOptions(0));
 }
 
-export async function readAdminSessionUserId() {
+export async function readAdminSession() {
   const jar = await cookies();
   const token = jar.get(ADMIN_SESSION_COOKIE)?.value;
 
@@ -47,13 +51,17 @@ export async function readAdminSessionUserId() {
   }
 
   try {
-    const { payload } = await jwtVerify(token, secretKey());
+    const { payload } = await jwtVerify(token, await secretKey(), {
+      algorithms: ["HS256"],
+      issuer: SESSION_ISSUER,
+      audience: AUDIENCE,
+    });
 
-    if (payload.kind !== "admin" || typeof payload.sub !== "string" || payload.sub.length === 0) {
+    if (payload.kind !== "admin" || typeof payload.sub !== "string" || payload.sub.length === 0 || typeof payload.sv !== "number") {
       return null;
     }
 
-    return payload.sub;
+    return { userId: payload.sub, sessionVersion: payload.sv };
   } catch (error) {
     if (error instanceof AdminConfigError) {
       throw error;

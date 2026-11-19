@@ -58,7 +58,7 @@ export async function PATCH(request: Request) {
     }
 
     if (email.success && body && typeof body === "object" && "email" in body && !("nextPassword" in body)) {
-      return Response.json(await updateAdminEmail(access.user.id, email.data.email));
+      return Response.json(await updateAdminEmail(access.user.id, email.data.email, email.data.currentPassword));
     }
 
     if (password.success) {

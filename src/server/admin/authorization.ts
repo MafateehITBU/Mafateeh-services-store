@@ -2,7 +2,7 @@ import "server-only";
 
 import { AdminConfigError } from "@/lib/admin-env";
 import { prisma } from "@/lib/prisma";
-import { readAdminSessionUserId } from "@/server/admin/session";
+import { readAdminSession } from "@/server/admin/session";
 import type { AdminPrincipal } from "@/types/admin";
 
 export type { AdminPrincipal };
@@ -12,10 +12,10 @@ export type AdminAccess =
   | { ok: false; status: 401 | 403 | 503; message?: string };
 
 export async function getAdminAccess(level: "admin" | "super" = "admin"): Promise<AdminAccess> {
-  let userId: string | null;
+  let session: { userId: string; sessionVersion: number } | null;
 
   try {
-    userId = await readAdminSessionUserId();
+    session = await readAdminSession();
   } catch (error) {
     if (error instanceof AdminConfigError) {
       return { ok: false, status: 503, message: error.message };
@@ -24,16 +24,16 @@ export async function getAdminAccess(level: "admin" | "super" = "admin"): Promis
     throw error;
   }
 
-  if (!userId) {
+  if (!session) {
     return { ok: false, status: 401 };
   }
 
   const user = await prisma.user.findUnique({
-    where: { id: userId },
-    select: { id: true, email: true, role: true, status: true },
+    where: { id: session.userId },
+    select: { id: true, email: true, role: true, status: true, sessionVersion: true },
   });
 
-  if (!user || user.status !== "ACTIVE") {
+  if (!user || user.status !== "ACTIVE" || user.sessionVersion !== session.sessionVersion) {
     return { ok: false, status: 401 };
   }
 

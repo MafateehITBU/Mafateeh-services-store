@@ -93,12 +93,15 @@ export function AccountSettings() {
         className="space-y-4 rounded-2xl border border-line bg-white p-5 shadow-[var(--shadow-soft)]"
         onSubmit={(event) => {
           event.preventDefault();
-          void save({ email }, "Email updated.");
+          void save({ email, currentPassword }, "Email updated.");
         }}
       >
         <h2 className="text-lg font-bold">Email</h2>
         <label className="block text-sm font-semibold">Administrator email
           <input className={`${fieldClass} mt-2`} type="email" value={email} onChange={(event) => setEmail(event.target.value)} required maxLength={254} />
+        </label>
+        <label className="block text-sm font-semibold">Current password
+          <input className={`${fieldClass} mt-2`} type="password" value={currentPassword} onChange={(event) => setCurrentPassword(event.target.value)} required autoComplete="current-password" />
         </label>
         <Button type="submit" disabled={busy}>Save email</Button>
       </form>
@@ -116,7 +119,7 @@ export function AccountSettings() {
             <input className={`${fieldClass} mt-2`} type="password" value={currentPassword} onChange={(event) => setCurrentPassword(event.target.value)} required autoComplete="current-password" />
           </label>
           <label className="block text-sm font-semibold">New password
-            <input className={`${fieldClass} mt-2`} type="password" value={nextPassword} onChange={(event) => setNextPassword(event.target.value)} required minLength={8} autoComplete="new-password" />
+            <input className={`${fieldClass} mt-2`} type="password" value={nextPassword} onChange={(event) => setNextPassword(event.target.value)} required minLength={12} autoComplete="new-password" />
           </label>
         </div>
         <Button type="submit" disabled={busy}>Change password</Button>

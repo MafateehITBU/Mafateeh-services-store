@@ -1408,6 +1408,11 @@ Sign-in and email-change codes are 6 digits. A wrong attempt is recorded with a 
 
 Request limits use a fixed window stored in `RateLimitWindow`, so they survive a restart. The in-memory store remains available for tests. `TRUSTED_PROXY_HEADER` is empty by default, and forwarded addresses are ignored until it is set. Administrator sign-in is limited by IP and email together, waits longer after each attempt, and still runs a password hash when the account does not exist. Every POST, PUT, PATCH, and DELETE under `src/app/api` checks the request origin. JSON and catalog bodies are capped: 16 KB for auth, 64 KB for ordinary admin forms, 12 MB for image forms, and 60 MB for catalog import. Responses send a content security policy, HSTS, nosniff, a strict referrer policy, a permissions policy, and `frame-ancestors 'none'`. The `X-Powered-By` header is off.
 
+## 42. Sessions and passwords
+
+`User.sessionVersion` is stored in the administrator and customer session tokens. Authorization, the storefront user lookup, and customer account actions reject a token whose version does not match the account. Password changes, administrator email changes, customer email changes, and a customer status other than active increment the version, so older sessions stop. The person who just changed their own credentials receives a new token. Session keys and the OTP hash key are derived from `SESSION_SECRET` with HKDF, and tokens are checked as HS256 with an issuer and audience. New password hashes store the scrypt cost as `scrypt$N$r$p$salt$hash` with N at 2^17. Older hashes still verify, and a successful sign-in replaces an outdated hash. Administrator email changes require the current password. New administrator passwords must be at least 12 characters. `npm run admin:bootstrap` asks for the password without echoing it when `SUPER_ADMIN_PASSWORD` is not set. The local database port is bound to 127.0.0.1.
+
+
 
 
 

@@ -4,8 +4,9 @@ import { createHmac, randomBytes, randomInt, timingSafeEqual } from "node:crypto
 import { OtpPurpose } from "@/generated/prisma/enums";
 import { prisma } from "@/lib/prisma";
 import { readSessionSecret } from "@/lib/admin-env";
-import { createCustomerSession, readCustomerSessionUserId } from "@/server/auth/customer-session";
+import { createCustomerSession, readCustomerSession } from "@/server/auth/customer-session";
 import { sendCustomerOtpEmail } from "@/server/auth/customer-mailer";
+import { derivedSecret } from "@/server/security/session-keys";
 
 const RESEND_MS = 60_000;
 const CODE_TTL_MS = 5 * 60_000;
@@ -16,12 +17,16 @@ const MAX_ATTEMPTS = 5;
 const MAX_REQUESTS_PER_HOUR = 5;
 const CODE_SPACE = 1_000_000;
 
-function hashCode(email: string, code: string) {
-  return createHmac("sha256", readSessionSecret()).update(`customer-login:${email}:${code}`).digest("hex");
+async function otpKey() {
+  return Buffer.from(await derivedSecret(readSessionSecret(), "otp"));
 }
 
-function hashEmailChange(userId: string, email: string, code: string) {
-  return createHmac("sha256", readSessionSecret()).update(`customer-email-change:${userId}:${email}:${code}`).digest("hex");
+async function hashCode(email: string, code: string) {
+  return createHmac("sha256", await otpKey()).update(`customer-login:${email}:${code}`).digest("hex");
+}
+
+async function hashEmailChange(userId: string, email: string, code: string) {
+  return createHmac("sha256", await otpKey()).update(`customer-email-change:${userId}:${email}:${code}`).digest("hex");
 }
 
 function codesMatch(actualHash: string, expectedHash: string) {
@@ -39,8 +44,8 @@ function sixDigitCode() {
   return randomInt(0, CODE_SPACE).toString().padStart(6, "0");
 }
 
-function decoyHash(prefix: string) {
-  return createHmac("sha256", readSessionSecret()).update(`${prefix}:${randomBytes(16).toString("hex")}`).digest("hex");
+function decoyHash(prefix: string, key: Buffer) {
+  return createHmac("sha256", key).update(`${prefix}:${randomBytes(16).toString("hex")}`).digest("hex");
 }
 
 export async function purgeExpiredEmailOtps() {
@@ -121,10 +126,11 @@ export async function requestCustomerCode(email: string) {
   });
   const canDeliver = !existing || (existing.role === "CUSTOMER" && existing.status === "ACTIVE");
   const code = canDeliver ? sixDigitCode() : null;
+  const key = await otpKey();
   const created = await prisma.emailOtp.create({
     data: {
       email: normalized,
-      codeHash: code ? hashCode(normalized, code) : decoyHash(`customer-login:${normalized}`),
+      codeHash: code ? await hashCode(normalized, code) : decoyHash(`customer-login:${normalized}`, key),
       purpose: OtpPurpose.LOGIN,
       expiresAt: new Date(Date.now() + CODE_TTL_MS),
     },
@@ -167,7 +173,7 @@ export async function verifyCustomerCode(email: string, code: string) {
 
   const burned = await burnAttempt(challenge.id);
 
-  if (burned.count !== 1 || !/^\d{6}$/.test(code) || !codesMatch(hashCode(normalized, code), challenge.codeHash)) {
+  if (burned.count !== 1 || !/^\d{6}$/.test(code) || !codesMatch(await hashCode(normalized, code), challenge.codeHash)) {
     return { ok: false as const, status: 400 };
   }
 
@@ -182,7 +188,7 @@ export async function verifyCustomerCode(email: string, code: string) {
 
   const existing = await prisma.user.findUnique({
     where: { email: normalized },
-    select: { id: true, role: true, status: true, profileCompletedAt: true, firstName: true },
+    select: { id: true, role: true, status: true, profileCompletedAt: true, firstName: true, sessionVersion: true },
   });
 
   if (existing && (existing.role !== "CUSTOMER" || existing.status !== "ACTIVE")) {
@@ -193,14 +199,14 @@ export async function verifyCustomerCode(email: string, code: string) {
     ? await prisma.user.update({
         where: { id: existing.id },
         data: { emailVerifiedAt: new Date() },
-        select: { id: true, profileCompletedAt: true, firstName: true },
+        select: { id: true, profileCompletedAt: true, firstName: true, sessionVersion: true },
       })
     : await prisma.user.create({
         data: { email: normalized, role: "CUSTOMER", emailVerifiedAt: new Date() },
-        select: { id: true, profileCompletedAt: true, firstName: true },
+        select: { id: true, profileCompletedAt: true, firstName: true, sessionVersion: true },
       });
 
-  await createCustomerSession(user.id);
+  await createCustomerSession(user.id, user.sessionVersion);
 
   return {
     ok: true as const,
@@ -209,18 +215,18 @@ export async function verifyCustomerCode(email: string, code: string) {
 }
 
 export async function saveCustomerProfile(input: { firstName: string; lastName: string; phone: string; phoneCountry: string }) {
-  const userId = await readCustomerSessionUserId();
+  const session = await readCustomerSession();
 
-  if (!userId) {
+  if (!session) {
     return { ok: false as const, status: 401 };
   }
 
   const user = await prisma.user.findUnique({
-    where: { id: userId },
-    select: { id: true, role: true, status: true },
+    where: { id: session.userId },
+    select: { id: true, role: true, status: true, sessionVersion: true },
   });
 
-  if (!user || user.role !== "CUSTOMER" || user.status !== "ACTIVE") {
+  if (!user || user.role !== "CUSTOMER" || user.status !== "ACTIVE" || user.sessionVersion !== session.sessionVersion) {
     return { ok: false as const, status: 401 };
   }
 
@@ -239,18 +245,18 @@ export async function saveCustomerProfile(input: { firstName: string; lastName: 
 }
 
 async function requireActiveCustomer() {
-  const userId = await readCustomerSessionUserId();
+  const session = await readCustomerSession();
 
-  if (!userId) {
+  if (!session) {
     return null;
   }
 
   const user = await prisma.user.findUnique({
-    where: { id: userId },
-    select: { id: true, role: true, status: true, email: true },
+    where: { id: session.userId },
+    select: { id: true, role: true, status: true, email: true, sessionVersion: true },
   });
 
-  if (!user || user.role !== "CUSTOMER" || user.status !== "ACTIVE") {
+  if (!user || user.role !== "CUSTOMER" || user.status !== "ACTIVE" || user.sessionVersion !== session.sessionVersion) {
     return null;
   }
 
@@ -299,10 +305,11 @@ export async function requestEmailChange(nextEmail: string) {
 
   const taken = await prisma.user.findUnique({ where: { email }, select: { id: true } });
   const code = taken ? null : sixDigitCode();
+  const key = await otpKey();
   const created = await prisma.emailOtp.create({
     data: {
       email,
-      codeHash: code ? hashEmailChange(user.id, email, code) : decoyHash(`customer-email-change:${user.id}:${email}`),
+      codeHash: code ? await hashEmailChange(user.id, email, code) : decoyHash(`customer-email-change:${user.id}:${email}`, key),
       purpose: OtpPurpose.CHANGE_EMAIL,
       expiresAt: new Date(Date.now() + CODE_TTL_MS),
     },
@@ -350,7 +357,7 @@ export async function confirmEmailChange(nextEmail: string, code: string) {
   }
 
   const burned = await burnAttempt(challenge.id);
-  const matches = /^\d{6}$/.test(code) && codesMatch(hashEmailChange(user.id, email, code), challenge.codeHash);
+  const matches = /^\d{6}$/.test(code) && codesMatch(await hashEmailChange(user.id, email, code), challenge.codeHash);
 
   if (burned.count !== 1 || !matches) {
     return { ok: false as const, status: 400, error: "invalid_code" };
@@ -371,10 +378,12 @@ export async function confirmEmailChange(nextEmail: string, code: string) {
     return { ok: false as const, status: 400, error: "invalid_code" };
   }
 
-  await prisma.user.update({
+  const updated = await prisma.user.update({
     where: { id: user.id },
-    data: { email, emailVerifiedAt: new Date() },
+    data: { email, emailVerifiedAt: new Date(), sessionVersion: { increment: 1 } },
+    select: { sessionVersion: true },
   });
+  await createCustomerSession(user.id, updated.sessionVersion);
 
   return { ok: true as const, email };
 }

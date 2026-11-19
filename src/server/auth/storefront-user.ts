@@ -1,22 +1,22 @@
 import "server-only";
 
 import { prisma } from "@/lib/prisma";
-import { readCustomerSessionUserId } from "@/server/auth/customer-session";
+import { readCustomerSession } from "@/server/auth/customer-session";
 
 export async function readStorefrontCustomer() {
   try {
-    const userId = await readCustomerSessionUserId();
+    const session = await readCustomerSession();
 
-    if (!userId) {
+    if (!session) {
       return null;
     }
 
     const user = await prisma.user.findUnique({
-      where: { id: userId },
-      select: { id: true, role: true, status: true, firstName: true, profileCompletedAt: true, avatarUrl: true },
+      where: { id: session.userId },
+      select: { id: true, role: true, status: true, firstName: true, profileCompletedAt: true, avatarUrl: true, sessionVersion: true },
     });
 
-    if (!user || user.role !== "CUSTOMER" || user.status !== "ACTIVE") {
+    if (!user || user.role !== "CUSTOMER" || user.status !== "ACTIVE" || user.sessionVersion !== session.sessionVersion) {
       return null;
     }
 

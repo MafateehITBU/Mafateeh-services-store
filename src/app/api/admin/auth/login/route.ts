@@ -51,7 +51,7 @@ export async function POST(request: Request) {
       );
     }
 
-    await createAdminSession(authenticated.userId);
+    await createAdminSession(authenticated.userId, authenticated.sessionVersion);
   } catch (error) {
     return adminFailureResponse(error);
   }

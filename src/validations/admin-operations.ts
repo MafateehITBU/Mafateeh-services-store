@@ -21,11 +21,14 @@ export const adminProfileSchema = z.object({
 
 export const adminEmailSchema = z.object({
   email: z.string().trim().email().max(254),
+  currentPassword: z.string().min(1).max(200),
 });
+
+export const newPasswordSchema = z.string().min(12).max(200);
 
 export const adminPasswordSchema = z.object({
   currentPassword: z.string().min(1).max(200),
-  nextPassword: z.string().min(8).max(200),
+  nextPassword: newPasswordSchema,
 });
 
 export function optionalDay(value: string | null) {

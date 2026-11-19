@@ -3,6 +3,7 @@ import "server-only";
 import { prisma } from "@/lib/prisma";
 import { writeAdminAuditLog } from "@/server/admin/audit";
 import { hashPassword, verifyPassword } from "@/server/admin/password";
+import { createAdminSession } from "@/server/admin/session";
 
 export class AccountRuleError extends Error {
   constructor(message: string) {
@@ -55,12 +56,19 @@ export async function updateAdminProfile(id: string, input: { firstName: string;
   return { firstName: updated.firstName ?? "", lastName: updated.lastName ?? "" };
 }
 
-export async function updateAdminEmail(id: string, email: string) {
+export async function updateAdminEmail(id: string, email: string, currentPassword: string) {
   const nextEmail = email.trim().toLowerCase();
-  const current = await getAdminAccount(id);
+  const current = await prisma.user.findFirst({
+    where: { id, role: { in: ["ADMIN", "SUPER_ADMIN"] }, status: "ACTIVE" },
+    select: { id: true, email: true, passwordHash: true },
+  });
 
-  if (!current) {
+  if (!current?.passwordHash) {
     throw new AccountRuleError("Administrator account not found.");
+  }
+
+  if (!(await verifyPassword(currentPassword, current.passwordHash))) {
+    throw new AccountRuleError("Current password is incorrect.");
   }
 
   const existing = await prisma.user.findUnique({ where: { email: nextEmail }, select: { id: true } });
@@ -71,9 +79,11 @@ export async function updateAdminEmail(id: string, email: string) {
 
   const updated = await prisma.user.update({
     where: { id },
-    data: { email: nextEmail },
-    select: { email: true },
+    data: { email: nextEmail, sessionVersion: { increment: 1 } },
+    select: { email: true, sessionVersion: true },
   });
+
+  await createAdminSession(id, updated.sessionVersion);
 
   await writeAdminAuditLog({
     actorId: id,
@@ -103,10 +113,12 @@ export async function updateAdminPassword(id: string, currentPassword: string, n
     throw new AccountRuleError("Current password is incorrect.");
   }
 
-  await prisma.user.update({
+  const updated = await prisma.user.update({
     where: { id },
-    data: { passwordHash: await hashPassword(nextPassword) },
+    data: { passwordHash: await hashPassword(nextPassword), sessionVersion: { increment: 1 } },
+    select: { sessionVersion: true },
   });
+  await createAdminSession(id, updated.sessionVersion);
 
   await writeAdminAuditLog({
     actorId: id,

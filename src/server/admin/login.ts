@@ -1,7 +1,7 @@
 import "server-only";
 
 import { prisma } from "@/lib/prisma";
-import { dummyPasswordHash, verifyPassword } from "@/server/admin/password";
+import { dummyPasswordHash, hashPassword, passwordNeedsRehash, verifyPassword } from "@/server/admin/password";
 
 function isAdministrator(role: string, status: string) {
   return status === "ACTIVE" && (role === "ADMIN" || role === "SUPER_ADMIN");
@@ -17,6 +17,7 @@ export async function authenticateAdmin(email: string, password: string) {
       status: true,
       passwordHash: true,
       emailVerifiedAt: true,
+      sessionVersion: true,
     },
   });
 
@@ -31,6 +32,13 @@ export async function authenticateAdmin(email: string, password: string) {
     return null;
   }
 
+  if (passwordNeedsRehash(user.passwordHash)) {
+    await prisma.user.update({
+      where: { id: user.id },
+      data: { passwordHash: await hashPassword(password) },
+    });
+  }
+
   if (!user.emailVerifiedAt) {
     await prisma.user.update({
       where: { id: user.id },
@@ -38,5 +46,5 @@ export async function authenticateAdmin(email: string, password: string) {
     });
   }
 
-  return { userId: user.id };
+  return { userId: user.id, sessionVersion: user.sessionVersion };
 }
