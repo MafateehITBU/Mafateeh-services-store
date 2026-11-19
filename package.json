@@ -27,7 +27,7 @@
     "@prisma/adapter-pg": "7.10.1",
     "@prisma/client": "7.10.1",
     "@tiptap/extension-color": "^3.32.2",
-    "@tiptap/extension-highlight": "^3.32.2",
+    "@tiptap/extension-highlight": "^3.34.0",
     "@tiptap/extension-link": "^3.32.2",
     "@tiptap/extension-placeholder": "^3.32.2",
     "@tiptap/extension-table": "^3.32.2",
